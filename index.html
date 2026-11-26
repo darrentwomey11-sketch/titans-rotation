@@ -757,7 +757,7 @@ function viewRoster(){
       ${UI.armed === 'del-' + p.id ? `<button class="del armed" data-act="delPlayer" data-id="${p.id}">Remove</button>` : `<button class="del" data-act="arm" data-key="del-${p.id}" aria-label="Remove ${esc(p.name)}">×</button>`}
       <input class="in-txt note-in" id="note-${p.id}" data-pf="note" data-id="${p.id}" value="${esc(p.note || '')}" placeholder="Strengths / role (e.g. best rebounder)" aria-label="Notes for ${esc(p.name)}" autocomplete="off">
     </div>`).join('')}</div>
-    <div class="row-actions"><button class="btn" data-act="addPlayer">Add player</button>${armBtn('reset', 'Reset to sample roster', 'Erase roster and season?', 'resetAll', true, 'btn')}</div>
+    <div class="row-actions"><button class="btn" data-act="goBackup">Load roster code</button><button class="btn" data-act="addPlayer">Add player</button>${armBtn('reset', 'Reset to sample roster', 'Erase roster and season?', 'resetAll', true, 'btn')}</div>
     ${isStandalone() ? '' : '<button class="btn" data-act="install">Add to Home Screen</button>'}
     <p class="help"><b>Core</b> players make up most of the floor in the real game. <b>Developing</b> players get the 5th quarter plus a share of the one developing spot on the floor. Everything is saved on this phone.</p>
   </section>`;
@@ -765,7 +765,7 @@ function viewRoster(){
 
 function viewSeason(){
   const H = S.history;
-  if (!H.length) return `<div class="card empty"><h3>No games saved yet</h3><p>After a game, tap “Save minutes to season” on the Rotation tab. Saved minutes are used to even things out the next game.</p></div>`;
+  if (!H.length) return `<div class="card empty"><h3>No games saved yet</h3><p>After a game, tap “Save minutes to season” on the Rotation tab. Saved minutes are used to even things out the next game.</p></div>${backupHTML()}`;
   const R = ranked();
   const stat = {};
   H.forEach(g => Object.entries(g.mins || {}).forEach(([id, m]) => { const t = stat[id] = stat[id] || {gp:0, g:0, f:0}; t.gp++; t.g += m.g; t.f += m.f; }));
@@ -780,14 +780,18 @@ function viewSeason(){
     <div class="games">${H.slice().reverse().map(g => `<div class="game"><div><b>${g.opp ? 'vs ' + esc(g.opp) : 'Game'}</b> <span class="num">${esc(g.date)}</span><br><span>${Object.keys(g.mins || {}).length} players</span></div>
       ${UI.armed === 'g-' + g.id ? `<button class="btn small danger" data-act="delGame" data-id="${g.id}">Delete</button>` : `<button class="btn small" data-act="arm" data-key="g-${g.id}">Delete</button>`}</div>`).join('')}</div>
   </section>
-  <section class="block">
-    <h2>Backup</h2>
+  ${backupHTML()}`;
+}
+
+function backupHTML(){
+  return `<section class="block" id="backup">
+    <h2>Backup &amp; roster code</h2>
     <div class="card fields">
       <p class="help">Data lives on this phone only. Copy a backup code to move it to another phone or keep it safe.</p>
       <button class="btn" data-act="copyBackup">Copy backup code</button>
-      <label class="flabel" for="restore">Restore from a backup code</label>
-      <textarea class="in-txt" id="restore" placeholder="Paste backup code here"></textarea>
-      <button class="btn" data-act="restore">Restore</button>
+      <label class="flabel" for="restore">Load a roster or backup code</label>
+      <textarea class="in-txt" id="restore" placeholder="Paste the code here"></textarea>
+      <button class="btn primary" data-act="restore">Load code</button>
     </div>
   </section>`;
 }
@@ -889,6 +893,7 @@ const A = {
     UI.sheet = {type:'install'};
   },
   installLater(){ S.installDismissed = true; },
+  goBackup(){ S.tab = 'season'; UI.sheet = null; render(); const b = document.getElementById('backup'); if (b) b.scrollIntoView(); return 'noRender'; },
   pick(d){ UI.sheet = {type:'pick', seg:+d.seg, id:d.id}; },
   closeSheet(){ UI.sheet = null; },
   swap(d){
@@ -934,7 +939,8 @@ const A = {
       if (!Array.isArray(d.roster) || !d.roster.length) throw new Error('no roster');
       S.team = d.team || S.team; S.roster = d.roster; S.settings = {...DEFAULT_SETTINGS, ...(d.settings || {})};
       S.history = Array.isArray(d.history) ? d.history : []; S.plan = null; S.sample = false; S.here = {};
-      toast('Backup restored');
+      S.tab = 'today'; window.scrollTo(0, 0);
+      toast(`Loaded ${S.roster.length} players`);
     } catch (e) { toast('That code didn\'t work. Copy the whole backup code and try again.'); return 'noRender'; }
   },
 };
