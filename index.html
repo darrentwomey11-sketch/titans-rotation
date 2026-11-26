@@ -444,17 +444,32 @@ const Engine = (() => {
 const KEY = 'titans-rotation-v1';
 const DEFAULT_SETTINGS = {periods:4, qLen:7, subsPerQ:2, fifth:true, fifthLen:8, fifthSubs:1, devOnFloor:1, coreMode:'balanced', startStrong:true, finishStrong:true};
 const uid = () => 'p' + Math.random().toString(36).slice(2, 9);
+const TEAM_ROSTER = [
+  ['Ellie',   'core', 'Strong ball handler, drives to the hoop'],
+  ['Greta',   'core', 'Strong ball handler, drives to the hoop'],
+  ['Gwen',    'core', 'Tallest, best rebounder'],
+  ['Morgan',  'core', 'Lockdown defender, solid handles'],
+  ['Audrey',  'core', 'Size, rebounding, dribbling'],
+  ['Stella',  'core', 'Sixth man, can handle the ball'],
+  ['Ava',     'dev',  'Can dribble, similar to Stella'],
+  ['Maleia',  'dev',  'Great teammate, coachable'],
+  ['Jordan',  'dev',  'Size; working on fundamentals'],
+  ['Scarlet', 'dev',  'Height; building athleticism'],
+  ['Olivia',  'dev',  'Aggressive; watch the fouls'],
+];
 function sampleRoster(){
-  return Array.from({length:11}, (_, i) => ({id:uid(), name:'Player ' + (i + 1), num:'', tier: i < 6 ? 'core' : 'dev'}));
+  return TEAM_ROSTER.map(([name, tier, note]) => ({id:'p' + name.toLowerCase(), name, num:'', tier, note}));
 }
 function fresh(){
-  return {team:'Titans', roster:sampleRoster(), sample:true, settings:{...DEFAULT_SETTINGS}, here:{}, plan:null, history:[], tab:'today'};
+  return {team:'Titans', roster:sampleRoster(), sample:false, settings:{...DEFAULT_SETTINGS}, here:{}, plan:null, history:[], tab:'today'};
 }
 function load(){ try { const t = localStorage.getItem(KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
 let S = load();
 if (!S || !Array.isArray(S.roster) || !S.roster.length) S = fresh();
+// Phones that opened the earlier version still hold the "Player 1–11" placeholders: swap in the team.
+if (S.sample){ S.roster = sampleRoster(); S.sample = false; S.here = {}; S.plan = null; S.settings.qLen = 7; }
 S.settings = {...DEFAULT_SETTINGS, ...(S.settings || {})};
 S.here = S.here || {};
 S.history = S.history || [];
@@ -757,7 +772,7 @@ function viewRoster(){
       ${UI.armed === 'del-' + p.id ? `<button class="del armed" data-act="delPlayer" data-id="${p.id}">Remove</button>` : `<button class="del" data-act="arm" data-key="del-${p.id}" aria-label="Remove ${esc(p.name)}">×</button>`}
       <input class="in-txt note-in" id="note-${p.id}" data-pf="note" data-id="${p.id}" value="${esc(p.note || '')}" placeholder="Strengths / role (e.g. best rebounder)" aria-label="Notes for ${esc(p.name)}" autocomplete="off">
     </div>`).join('')}</div>
-    <div class="row-actions"><button class="btn" data-act="goBackup">Load roster code</button><button class="btn" data-act="addPlayer">Add player</button>${armBtn('reset', 'Reset to sample roster', 'Erase roster and season?', 'resetAll', true, 'btn')}</div>
+    <div class="row-actions"><button class="btn" data-act="goBackup">Load roster code</button><button class="btn" data-act="addPlayer">Add player</button>${armBtn('reset', 'Reset to team roster', 'Erase changes and season?', 'resetAll', true, 'btn')}</div>
     ${isStandalone() ? '' : '<button class="btn" data-act="install">Add to Home Screen</button>'}
     <p class="help"><b>Core</b> players make up most of the floor in the real game. <b>Developing</b> players get the 5th quarter plus a share of the one developing spot on the floor. Everything is saved on this phone.</p>
   </section>`;

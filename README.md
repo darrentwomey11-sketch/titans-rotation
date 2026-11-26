@@ -6,4 +6,4 @@ Fair-minutes rotation planner for the Spring Lake Titans travel basketball team.
 - Live mode steps through each sub; mark a player hurt and the rest of the game re-balances.
 - Add to Home Screen to use it like an app. Works offline after the first visit.
 
-Rosters and season minutes are stored only on the phone using the app. No player data is in this repository.
+The app opens with the team roster built in. Changes the coach makes and season minutes are stored only on the phone using the app.
