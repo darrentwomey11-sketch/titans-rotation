@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Titans Rotation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0b3a8c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Titans">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone-width column under a sticky navy scoreboard header, thumb-reach tab bar at the bottom; the rotation grid scrolls sideways inside its own box. */
+:root{
+  --bg:#edf0f5; --surface:#ffffff; --surface-2:#f5f7fb; --ink:#101a2c; --muted:#5a6578; --line:#d5dce7;
+  --accent:#0b4aa8; --accent-ink:#ffffff; --accent-soft:#dfe9f8;
+  --head:#0b3a8c; --head-ink:#ffffff; --head-muted:#b4cdee; --sky:#7cc0ee; --navy:#06275e;
+  --core:#e2651d; --core-soft:#fde4d3; --core-ink:#9a3f0b;
+  --dev:#6a49d3; --dev-soft:#ebe5fb; --dev-ink:#4b2fa8;
+  --cell-off:#e6eaf1; --cur-col:#fff4c9;
+  --ok:#1b7a45; --ok-soft:#dcf2e5; --warn:#9a5d0a; --warn-soft:#fbefd9; --bad:#b83131; --bad-soft:#f9e0e0;
+  --font-display:'Barlow Condensed','Arial Narrow','Roboto Condensed',system-ui,sans-serif;
+  --font-body:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b111c; --surface:#131b29; --surface-2:#182233; --ink:#e7ecf4; --muted:#93a0b5; --line:#263247;
+    --accent:#7cc0ee; --accent-ink:#06172f; --accent-soft:#13284a;
+    --head:#082d6e; --head-ink:#ffffff; --head-muted:#9dbbe2; --sky:#7cc0ee; --navy:#041c45;
+    --core:#f07c38; --core-soft:#3a2418; --core-ink:#ffb487;
+    --dev:#9a80f0; --dev-soft:#271f45; --dev-ink:#c8b9ff;
+    --cell-off:#1f2a3c; --cur-col:#3a3416;
+    --ok:#5fd394; --ok-soft:#14301f; --warn:#f0b65a; --warn-soft:#33270f; --bad:#ff7b7b; --bad-soft:#3a1717;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b111c; --surface:#131b29; --surface-2:#182233; --ink:#e7ecf4; --muted:#93a0b5; --line:#263247;
+  --accent:#7cc0ee; --accent-ink:#06172f; --accent-soft:#13284a;
+  --head:#082d6e; --head-ink:#ffffff; --head-muted:#9dbbe2; --sky:#7cc0ee; --navy:#041c45;
+  --core:#f07c38; --core-soft:#3a2418; --core-ink:#ffb487;
+  --dev:#9a80f0; --dev-soft:#271f45; --dev-ink:#c8b9ff;
+  --cell-off:#1f2a3c; --cur-col:#3a3416;
+  --ok:#5fd394; --ok-soft:#14301f; --warn:#f0b65a; --warn-soft:#33270f; --bad:#ff7b7b; --bad-soft:#3a1717;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--head)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--head);color:var(--head-ink)}
+.top-in{max-width:680px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{width:34px;height:34px;flex:none}
+.brand-txt{display:flex;flex-direction:column;min-width:0}
+.brand b{font-family:var(--font-display);font-style:italic;font-weight:800;font-size:28px;letter-spacing:.03em;text-transform:uppercase;line-height:.95;color:var(--sky);
+  text-shadow:2px 2px 0 var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}
+.brand span{font-family:var(--font-display);font-weight:700;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--head-muted)}
+.top-pill{font-size:12px;font-weight:600;color:var(--head-muted);white-space:nowrap}
+.top-pill b{color:var(--head-ink)}
+
+/* page */
+.wrap{max-width:680px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 28px;
+  display:flex;flex-direction:column;gap:22px}
+h2{font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1.1;text-wrap:balance}
+h3{margin:0}
+.block{display:flex;flex-direction:column;gap:12px;min-width:0}
+.block-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sub{margin:0;color:var(--muted);font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.note{background:var(--warn-soft);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.note b{color:var(--warn)}
+.help{font-size:12.5px;color:var(--muted);margin:0}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.big{min-height:54px;font-size:16px;width:100%;font-family:var(--font-display);letter-spacing:.06em;text-transform:uppercase;font-weight:700;font-size:19px}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.small{min-height:36px;padding:0 12px;font-size:13px}
+.btn.link{border:none;background:none;color:var(--accent);padding:0 4px;min-height:32px}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap}
+.row-actions .btn{flex:1 1 140px}
+
+/* tags */
+.tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.tag.core{background:var(--core-soft);color:var(--core-ink)}
+.tag.dev{background:var(--dev-soft);color:var(--dev-ink)}
+.tag.out{background:var(--bad-soft);color:var(--bad)}
+
+/* who's here */
+.plist{display:flex;flex-direction:column;gap:6px}
+.grp{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:8px 2px 0;display:flex;justify-content:space-between}
+.prow{display:grid;grid-template-columns:30px minmax(0,1fr) auto auto;align-items:center;gap:10px;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:52px}
+.prow .rk{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--muted);text-align:center}
+.prow .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm small{color:var(--muted);font-weight:500;margin-right:4px}
+.prow .st{font-size:12px;font-weight:700;min-width:46px;text-align:center;padding:5px 8px;border-radius:8px;background:var(--ok-soft);color:var(--ok)}
+.prow.is-out{background:var(--surface-2);border-style:dashed}
+.prow.is-out .nm{color:var(--muted);text-decoration:line-through}
+.prow.is-out .st{background:var(--bad-soft);color:var(--bad)}
+
+/* settings */
+.fields{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+.flabel{font-size:13px;font-weight:600}
+.segc{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.segc button{flex:1 1 0;min-width:0;min-height:40px;border:none;background:none;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.segc button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12),0 0 0 1px var(--line)}
+.proj{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.proj > div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.proj .big{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.1}
+.proj .big small{font-size:15px;color:var(--muted);font-weight:600}
+.proj .core-c .big{color:var(--core)}
+.proj .dev-c .big{color:var(--dev)}
+
+/* live */
+.live{background:var(--head);color:var(--head-ink);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.live .eyebrow{color:var(--head-muted)}
+.live-top{display:flex;justify-content:space-between;align-items:center}
+.live-clock{display:flex;align-items:baseline;gap:10px;font-family:var(--font-display);text-transform:uppercase}
+.live-clock b{font-size:40px;font-weight:800;line-height:1;letter-spacing:.02em}
+.live-clock span{font-size:26px;font-weight:600;color:var(--head-muted)}
+.floor{display:flex;flex-direction:column;gap:6px}
+.floor-p{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;background:rgb(255 255 255 / .08);border:1px solid rgb(255 255 255 / .14);color:var(--head-ink);border-radius:10px;padding:8px 10px;min-height:50px}
+.floor-p .jn{font-family:var(--font-display);font-weight:800;font-size:24px;text-align:center;line-height:1}
+.floor-p .fn{font-weight:600;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.next{background:rgb(255 255 255 / .06);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.io{display:flex;flex-direction:column;gap:4px;font-size:14.5px}
+.io b{display:inline-block;width:38px;font-size:11px;letter-spacing:.08em}
+.io .in{color:#7be3a4}
+.io .outx{color:#ff9b9b}
+.live-nav{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+.live-nav .btn{min-height:52px;background:rgb(255 255 255 / .1);border-color:rgb(255 255 255 / .18);color:var(--head-ink)}
+.live-nav .btn.go{background:#ffffff;color:#13203a;border-color:#ffffff;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.06em;font-size:19px;font-weight:700}
+.outlist{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--head-muted)}
+.outlist button{background:rgb(255 120 120 / .16);border:1px solid rgb(255 140 140 / .35);color:#ffd0d0;border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600}
+.live-exit{align-self:flex-start;background:none;border:none;color:var(--head-muted);font-size:12.5px;text-decoration:underline;padding:4px 0}
+
+/* grid */
+.grid-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.rgrid{border-collapse:separate;border-spacing:0;font-size:12.5px;width:100%}
+.rgrid th,.rgrid td{padding:0;text-align:center;white-space:nowrap}
+.rgrid thead th{font-weight:700;color:var(--muted);font-size:11px;letter-spacing:.05em;padding:6px 2px 2px}
+.rgrid thead tr:nth-child(2) th{font-weight:500;font-size:10px;padding:0 2px 6px;border-bottom:1px solid var(--line)}
+.rgrid .pcol{position:sticky;left:0;z-index:1;background:var(--surface);text-align:left;padding:0 8px 0 10px;max-width:120px;min-width:96px;overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--line)}
+.rgrid tbody .pcol{font-weight:600;font-size:13px;height:30px}
+.rgrid .pcol small{color:var(--muted);font-weight:500}
+.rgrid .gsep{border-left:2px solid var(--line)}
+.rgrid .cell{width:26px;min-width:26px;height:30px}
+.rgrid .cell i{display:block;width:16px;height:16px;margin:auto;border-radius:4px;background:var(--cell-off)}
+.rgrid .cell.on.core i{background:var(--core)}
+.rgrid .cell.on.dev i{background:var(--dev)}
+.rgrid .cur{background:var(--cur-col)}
+.rgrid .mcol{padding:0 8px;font-weight:700;min-width:42px;font-variant-numeric:tabular-nums}
+.rgrid thead .mcol{border-left:1px solid var(--line)}
+.rgrid tbody .mcol{border-left:1px solid var(--line)}
+.rgrid tbody .mcol.f{color:var(--muted);font-weight:600}
+.rgrid tr.sep td{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px 4px;background:var(--surface-2)}
+.rgrid tr.sep td.pcol{background:var(--surface-2)}
+.rgrid tr.isout .pcol{color:var(--bad)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+/* sub sheet */
+.segs{display:flex;flex-direction:column;gap:8px}
+.segcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.segcard.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.segcard.past{opacity:.62}
+.segcard header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.segcard .sl{font-family:var(--font-display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.03em;line-height:1}
+.segcard .ck{font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--muted)}
+.segcard .ed{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--warn);font-weight:600}
+.chg{font-size:13px;color:var(--muted)}
+.chg b{font-size:10.5px;letter-spacing:.08em;margin-right:3px}
+.chg .in{color:var(--ok)}
+.chg .outx{color:var(--bad)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 11px;font-size:13.5px;font-weight:600;border:1px solid transparent;min-height:36px}
+.chip.core{background:var(--core-soft);color:var(--core-ink)}
+.chip.dev{background:var(--dev-soft);color:var(--dev-ink)}
+.chip small{font-weight:500;opacity:.8}
+
+/* roster */
+.rlist{display:flex;flex-direction:column;gap:6px}
+.rrow{display:grid;grid-template-columns:auto 54px minmax(0,1fr) auto auto;gap:6px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px}
+.rk-ctl{display:flex;align-items:center;gap:2px}
+.rk-ctl span{font-family:var(--font-display);font-weight:700;font-size:19px;width:22px;text-align:center}
+.ib{width:30px;height:36px;border:none;background:var(--surface-2);border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.ib:disabled{opacity:.3}
+.ib svg{width:14px;height:14px}
+.in-txt{width:100%;min-width:0;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 10px;font-size:15px}
+.in-sel{height:40px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:0 6px;font-size:13px;font-weight:600;max-width:110px}
+.note-in{height:38px;font-size:13.5px}
+.rrow{grid-template-columns:auto 52px minmax(0,1fr) auto;grid-template-areas:"rk num name del" "tier note note note"}
+.rrow .rk-ctl{grid-area:rk}
+.rrow [data-pf="num"]{grid-area:num}
+.rrow [data-pf="name"]{grid-area:name}
+.rrow [data-pf="tier"]{grid-area:tier;height:38px}
+.rrow [data-pf="note"]{grid-area:note}
+.rrow .del{grid-area:del}
+.prow .nm em,.opt em{display:block;font-style:normal;font-weight:500;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.install{display:flex;gap:12px;align-items:center;background:var(--accent-soft);border-radius:var(--r);padding:12px 14px}
+.install svg{width:44px;height:44px;flex:none}
+.install p{margin:0;font-size:13.5px;flex:1;min-width:0}
+.install p b{display:block;font-size:14.5px}
+.install .acts{display:flex;flex-direction:column;gap:4px}
+.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;font-size:15px}
+.steps svg{width:18px;height:18px;vertical-align:-3px;color:var(--accent)}
+.del{width:36px;height:40px;border:none;background:none;color:var(--muted);border-radius:8px;font-size:18px}
+.del.armed{width:auto;padding:0 10px;background:var(--bad);color:#fff;font-size:12px;font-weight:700}
+.team-in{display:flex;flex-direction:column;gap:6px}
+textarea.in-txt{height:96px;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+/* season */
+.stable{width:100%;border-collapse:collapse;font-size:13.5px}
+.stable th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:8px 8px;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}
+.stable th:first-child,.stable td:first-child{text-align:left}
+.stable td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stable td:first-child{font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.games{display:flex;flex-direction:column;gap:6px}
+.game{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 8px 8px 12px}
+.game b{font-weight:600}
+.game span{color:var(--muted);font-size:12.5px}
+.empty{text-align:center;padding:28px 16px;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty h3{color:var(--ink);font-family:var(--font-display);text-transform:uppercase;letter-spacing:.04em;font-size:22px}
+
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+.tabs-in{max-width:680px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.tabs button{height:62px;border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-current="page"]{color:var(--accent)}
+
+/* sheet */
+.sheet{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet-bg{position:absolute;inset:0;background:rgb(5 10 20 / .5);border:none;width:100%}
+.sheet-panel{position:relative;background:var(--surface);border-radius:18px 18px 0 0;max-height:85vh;overflow-y:auto;
+  padding-top:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:14px;max-width:680px;width:100%;margin:0 auto}
+.sheet-panel h3{font-family:var(--font-display);font-size:24px;text-transform:uppercase;letter-spacing:.03em;line-height:1.05}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:48px;font-weight:600}
+.opt small{color:var(--muted);font-weight:500;font-size:12px}
+.opt-danger{background:var(--bad-soft);color:var(--bad);border:1px solid transparent;border-radius:10px;min-height:48px;font-weight:700;width:100%}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:13.5px;font-weight:600;box-shadow:0 6px 20px rgb(0 0 0 / .25);max-width:calc(100% - 32px)}
+
+@media (prefers-reduced-motion: no-preference){
+  .sheet-panel{animation:up .18s ease-out}
+  @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+}
+</style>
+</head><body>
+
+<header class="top"><div class="top-in">
+  <div class="brand"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0b3a8c"/><circle cx="318" cy="318" r="118" fill="none" stroke="#7cc0ee" stroke-opacity=".4" stroke-width="14"/><path d="M200 318h236M318 200v236M236 235c38 32 38 134 0 166M400 235c-38 32-38 134 0 166" fill="none" stroke="#7cc0ee" stroke-opacity=".4" stroke-width="12"/><path d="M148 136h256l-17 70h-74l-46 190h-78l46-190h-104z" fill="#06275e" transform="translate(12 12)"/><path d="M148 136h256l-17 70h-74l-46 190h-78l46-190h-104z" fill="#7cc0ee" stroke="#ffffff" stroke-width="8" stroke-linejoin="round"/></svg>
+    <div class="brand-txt"><b id="teamName">Titans</b><span>Spring Lake · Rotation</span></div></div>
+  <div class="top-pill" id="topPill"></div>
+</div></header>
+
+<main class="wrap" id="app"></main>
+
+<nav class="tabs" aria-label="Sections"><div class="tabs-in">
+  <button data-act="tab" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M8.5 15l2.5 2.5 5-5"/></svg>Today</button>
+  <button data-act="tab" data-tab="rotation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/></svg>Rotation</button>
+  <button data-act="tab" data-tab="roster"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M17 14.2c2.4 0 4 1.5 4.6 4.3"/></svg>Roster</button>
+  <button data-act="tab" data-tab="season"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Season</button>
+</div></nav>
+
+<div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script id="engine">
+/* Rotation engine: pure functions, no DOM. */
+const Engine = (() => {
+  function fmt(m){
+    let mm = Math.floor(m + 1e-9);
+    let ss = Math.round((m - mm) * 60);
+    if (ss === 60){ mm++; ss = 0; }
+    return mm + ':' + String(ss).padStart(2, '0');
+  }
+
+  function makeSegments(s){
+    const segs = [];
+    if (s.fifth){
+      const n = s.fifthSubs, len = s.fifthLen / n;
+      for (let i = 0; i < n; i++) segs.push({kind:'fifth', q:0, part:i, len, start:s.fifthLen - i*len, end:s.fifthLen - (i+1)*len, lineup:[], locked:false});
+    }
+    for (let q = 1; q <= s.periods; q++){
+      const n = s.subsPerQ, len = s.qLen / n;
+      for (let i = 0; i < n; i++) segs.push({kind:'game', q, part:i, len, start:s.qLen - i*len, end:s.qLen - (i+1)*len, lineup:[], locked:false});
+    }
+    return segs;
+  }
+
+  function coreWeight(mode, r, n){
+    if (n <= 1) return 1;
+    const t = r / (n - 1);
+    if (mode === 'win') return 1 - 0.55 * t;
+    if (mode === 'balanced') return 1 - 0.3 * t;
+    return 1;
+  }
+
+  // Split a pool of minutes across a group in proportion to weights, nobody above cap.
+  function waterfill(group, pool, w, cap, out){
+    let active = group.slice(), rem = Math.max(0, pool);
+    while (active.length){
+      const W = active.reduce((a, p) => a + w[p.id], 0);
+      const over = active.filter(p => rem * w[p.id] / W > cap + 1e-9);
+      if (!over.length){ active.forEach(p => out[p.id] = rem * w[p.id] / W); return; }
+      over.forEach(p => { out[p.id] = cap; rem -= cap; });
+      active = active.filter(p => !over.includes(p));
+    }
+  }
+
+  /*
+   segs: from makeSegments (lineups of locked segments are kept)
+   players: [{id, tier:'core'|'dev', rank}] who can still play
+   s: settings; opts.lockedUntil: segments before this index already happened
+   opts.season: {id: avg game minutes so far} used to break ties for developing players
+  */
+  function allocate(segs, players, s, opts = {}){
+    const lockedUntil = opts.lockedUntil || 0;
+    const season = opts.season || {};
+    const isLocked = (g, i) => i < lockedUntil || g.locked;
+    const byRank = (a, b) => a.rank - b.rank;
+    const core = players.filter(p => p.tier === 'core').sort(byRank);
+    const dev = players.filter(p => p.tier !== 'core').sort(byRank);
+    segs.forEach((g, i) => { if (!isLocked(g, i)) g.lineup = []; });
+
+    let d = Math.min(s.devOnFloor, dev.length);
+    const c = Math.min(5 - d, core.length);
+    d = Math.min(5 - c, dev.length);
+
+    const gameIdx = segs.map((g, i) => i).filter(i => segs[i].kind === 'game');
+    const totalGame = gameIdx.reduce((a, i) => a + segs[i].len, 0);
+    const got = {};
+    players.forEach(p => got[p.id] = 0);
+    gameIdx.forEach(i => { const g = segs[i]; if (isLocked(g, i)) g.lineup.forEach(id => { if (id in got) got[id] += g.len; }); });
+    const free = gameIdx.filter(i => !isLocked(segs[i], i));
+    const freeMin = free.reduce((a, i) => a + segs[i].len, 0);
+
+    const target = {}, w = {};
+    core.forEach((p, r) => w[p.id] = coreWeight(s.coreMode, r, core.length));
+    dev.forEach(p => w[p.id] = 1);
+    // When there is someone to rotate in, every core player gets at least one rest stretch.
+    const restLen = gameIdx.length ? Math.max(...gameIdx.map(i => segs[i].len)) : 0;
+    const coreCap = core.length > c ? Math.max(0, totalGame - restLen) : totalGame;
+    waterfill(core, c * freeMin + core.reduce((a, p) => a + got[p.id], 0), w, coreCap, target);
+    waterfill(dev, d * freeMin + dev.reduce((a, p) => a + got[p.id], 0), w, totalGame, target);
+
+    // Best core players open and close the game when asked to.
+    const fixed = {};
+    const topCore = core.slice(0, c).map(p => p.id);
+    if (gameIdx.length){
+      const first = gameIdx[0], last = gameIdx[gameIdx.length - 1];
+      if (s.startStrong && free.includes(first)) fixed[first] = topCore;
+      if (s.finishStrong && free.includes(last)) fixed[last] = topCore;
+    }
+    Object.keys(fixed).forEach(i => fixed[i].forEach(id => got[id] += segs[i].len));
+
+    const pick = (group, k, i, isDev) => {
+      const prev = i > 0 && segs[i-1].kind === 'game' ? new Set(segs[i-1].lineup) : new Set();
+      return group.slice().sort((a, b) => {
+        const na = target[a.id] - got[a.id], nb = target[b.id] - got[b.id];
+        if (Math.abs(na - nb) > 0.01) return nb - na;
+        const pa = prev.has(a.id) ? 1 : 0, pb = prev.has(b.id) ? 1 : 0;
+        if (pa !== pb) return pa - pb;
+        if (isDev){
+          const sa = season[a.id] ?? 0, sb = season[b.id] ?? 0;
+          if (Math.abs(sa - sb) > 0.01) return sa - sb;
+        }
+        return a.rank - b.rank;
+      }).slice(0, k).map(p => p.id);
+    };
+
+    for (const i of free){
+      const g = segs[i];
+      let cIds = fixed[i];
+      if (!cIds){ cIds = pick(core, c, i, false); cIds.forEach(id => got[id] += g.len); }
+      const dIds = pick(dev, d, i, true);
+      dIds.forEach(id => got[id] += g.len);
+      g.lineup = [...cIds, ...dIds];
+    }
+
+    // 5th quarter: developing players first, then core players with the fewest real-game minutes.
+    const fifthIdx = segs.map((g, i) => i).filter(i => segs[i].kind === 'fifth');
+    const fGot = {};
+    players.forEach(p => fGot[p.id] = 0);
+    fifthIdx.forEach(i => { if (isLocked(segs[i], i)) segs[i].lineup.forEach(id => { if (id in fGot) fGot[id] += segs[i].len; }); });
+    for (const i of fifthIdx){
+      if (isLocked(segs[i], i)) continue;
+      const order = players.slice().sort((a, b) => {
+        const ca = a.tier === 'core' ? 1 : 0, cb = b.tier === 'core' ? 1 : 0;
+        if (ca !== cb) return ca - cb;
+        if (fGot[a.id] !== fGot[b.id]) return fGot[a.id] - fGot[b.id];
+        if (Math.abs(got[a.id] - got[b.id]) > 0.01) return got[a.id] - got[b.id];
+        return b.rank - a.rank;
+      });
+      const ids = order.slice(0, 5).map(p => p.id);
+      ids.forEach(id => fGot[id] += segs[i].len);
+      segs[i].lineup = ids;
+    }
+    return segs;
+  }
+
+  function minutes(segs){
+    const m = {};
+    segs.forEach(g => g.lineup.forEach(id => {
+      m[id] = m[id] || {g:0, f:0};
+      m[id][g.kind === 'game' ? 'g' : 'f'] += g.len;
+    }));
+    return m;
+  }
+
+  function segLabel(g, s){
+    if (g.kind === 'fifth') return '5th Q';
+    return (s.periods === 2 ? 'H' : 'Q') + g.q;
+  }
+
+  return {fmt, makeSegments, allocate, minutes, segLabel};
+})();
+</script>
+
+<script>
+const KEY = 'titans-rotation-v1';
+const DEFAULT_SETTINGS = {periods:4, qLen:7, subsPerQ:2, fifth:true, fifthLen:8, fifthSubs:1, devOnFloor:1, coreMode:'balanced', startStrong:true, finishStrong:true};
+const uid = () => 'p' + Math.random().toString(36).slice(2, 9);
+function sampleRoster(){
+  return Array.from({length:11}, (_, i) => ({id:uid(), name:'Player ' + (i + 1), num:'', tier: i < 6 ? 'core' : 'dev'}));
+}
+function fresh(){
+  return {team:'Titans', roster:sampleRoster(), sample:true, settings:{...DEFAULT_SETTINGS}, here:{}, plan:null, history:[], tab:'today'};
+}
+function load(){ try { const t = localStorage.getItem(KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+let S = load();
+if (!S || !Array.isArray(S.roster) || !S.roster.length) S = fresh();
+S.settings = {...DEFAULT_SETTINGS, ...(S.settings || {})};
+S.here = S.here || {};
+S.history = S.history || [];
+S.tab = S.tab || 'today';
+const UI = {armed:null, sheet:null};
+
+/* ---------- helpers ---------- */
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ranked = () => S.roster.map((p, i) => ({...p, rank:i}));
+const byId = id => S.roster.find(p => p.id === id);
+const rankOf = id => { const i = S.roster.findIndex(p => p.id === id); return i < 0 ? 99 : i; };
+const sortIds = ids => ids.slice().sort((a, b) => rankOf(a) - rankOf(b));
+const isHere = id => S.here[id] !== false;
+const fmt = Engine.fmt;
+const tierWord = t => t === 'core' ? 'Core' : 'Dev';
+function pname(id, withNum = true){
+  const p = byId(id);
+  if (!p) return 'Removed player';
+  return (withNum && p.num ? '#' + p.num + ' ' : '') + p.name;
+}
+function nameHTML(id){
+  const p = byId(id);
+  if (!p) return 'Removed player';
+  return (p.num ? '<small>#' + esc(p.num) + '</small>' : '') + esc(p.name);
+}
+function mins(m){ const r = Math.round(m * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); }
+function seasonAvg(){
+  const tot = {}, gp = {};
+  S.history.forEach(g => Object.entries(g.mins || {}).forEach(([id, m]) => { tot[id] = (tot[id] || 0) + m.g; gp[id] = (gp[id] || 0) + 1; }));
+  const avg = {};
+  Object.keys(tot).forEach(id => avg[id] = tot[id] / gp[id]);
+  return avg;
+}
+function planKey(){
+  return JSON.stringify([S.roster.filter(p => isHere(p.id)).map(p => p.id + p.tier).sort(), S.roster.map(p => p.id).join(','), S.settings]);
+}
+function periodWord(s){ return s.periods === 2 ? 'Half' : 'Quarter'; }
+function lenOptions(s){ return s.periods === 2 ? [14, 16, 18, 20] : [6, 7, 8, 10]; }
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200);
+}
+
+/* ---------- planning ---------- */
+function buildPlan(){
+  const s = {...S.settings};
+  const segs = Engine.makeSegments(s);
+  const present = S.roster.filter(p => isHere(p.id)).map(p => p.id);
+  const players = ranked().filter(p => present.includes(p.id));
+  Engine.allocate(segs, players, s, {season:seasonAvg()});
+  S.plan = {s, segs, present, out:[], cur:null, opp:S.plan ? S.plan.opp : '', key:planKey(), savedId:null};
+}
+function replan(){
+  const P = S.plan;
+  const lockedUntil = P.cur == null ? 0 : P.cur;
+  P.segs.forEach((g, i) => { if (i >= lockedUntil && g.locked && g.lineup.some(id => P.out.includes(id))) g.locked = false; });
+  const players = ranked().filter(p => P.present.includes(p.id) && !P.out.includes(p.id));
+  Engine.allocate(P.segs, players, P.s, {lockedUntil, season:seasonAvg()});
+}
+function changes(a, b){
+  return {ins: sortIds(b.lineup.filter(x => !a.lineup.includes(x))), outs: sortIds(a.lineup.filter(x => !b.lineup.includes(x)))};
+}
+function projection(){
+  const s = {...S.settings};
+  const segs = Engine.makeSegments(s);
+  const players = ranked().filter(p => isHere(p.id));
+  Engine.allocate(segs, players, s, {season:seasonAvg()});
+  const m = Engine.minutes(segs);
+  const grp = t => players.filter(p => (p.tier === 'core') === (t === 'core')).map(p => m[p.id] || {g:0, f:0});
+  const range = arr => arr.length ? [Math.min(...arr), Math.max(...arr)] : null;
+  const c = grp('core'), d = grp('dev');
+  return {core:range(c.map(x => x.g)), coreF:range(c.map(x => x.f)), dev:range(d.map(x => x.g)), devF:range(d.map(x => x.f)), nc:c.length, nd:d.length};
+}
+
+/* ---------- views ---------- */
+function field(label, key, options, help){
+  const cur = S.settings[key];
+  return `<div class="field"><span class="flabel">${label}</span>
+    <div class="segc" role="group" aria-label="${esc(label)}">${options.map(([v, t]) =>
+      `<button data-act="set" data-key="${key}" data-val="${esc(JSON.stringify(v))}" aria-pressed="${cur === v}">${t}</button>`).join('')}</div>
+    ${help ? `<p class="help">${help}</p>` : ''}</div>`;
+}
+
+function viewToday(){
+  const R = ranked(), s = S.settings;
+  const core = R.filter(p => p.tier === 'core'), dev = R.filter(p => p.tier !== 'core');
+  const hc = core.filter(p => isHere(p.id)).length, hd = dev.filter(p => isHere(p.id)).length;
+  const row = p => `<button class="prow ${isHere(p.id) ? '' : 'is-out'}" data-act="toggleHere" data-id="${p.id}" aria-pressed="${isHere(p.id)}">
+      <span class="rk">${p.rank + 1}</span><span class="nm">${nameHTML(p.id)}${p.note ? `<em>${esc(p.note)}</em>` : ''}</span>
+      <span class="tag ${p.tier}">${tierWord(p.tier)}</span><span class="st">${isHere(p.id) ? 'Here' : 'Out'}</span></button>`;
+  const pr = projection();
+  const rng = r => !r ? '–' : (Math.round(r[0]) === Math.round(r[1]) ? mins(r[0]) : mins(r[0]) + '–' + mins(r[1]));
+  const len = s.qLen / s.subsPerQ;
+  const mode = {even:'Every core player gets about the same minutes.', balanced:'Higher-ranked core players play a little more.', win:'Your top players carry the most minutes.'}[s.coreMode];
+  const pw = periodWord(s).toLowerCase();
+  const building = S.plan && (S.plan.cur != null || S.plan.segs.some(g => g.locked));
+  return `
+  ${!isStandalone() && !S.installDismissed ? installCard() : ''}
+  <section class="block">
+    <div class="block-head"><h2>Who's here today?</h2><p class="sub num">${hc + hd} here · ${hc} core · ${hd} developing</p></div>
+    ${S.sample ? `<div class="note"><span><b>Sample roster.</b> Put in your real players on the Roster tab.</span><button class="btn small" data-act="tab" data-tab="roster">Edit roster</button></div>` : ''}
+    <p class="help">Tap a player to mark them out (hurt, sick, missing).</p>
+    ${hc > 0 && hc <= 5 - s.devOnFloor ? `<div class="note"><span><b>Only ${hc} core here.</b> They'll play the whole game${hc < 5 - s.devOnFloor ? ' and developing players fill the open spots' : ''}.${s.devOnFloor === 1 && hd >= 2 ? ' Switching to 3 core + 2 dev gives them a breather.' : ''}</span></div>` : ''}
+    <div class="plist">
+      <div class="grp"><span>Core</span><span class="num">${hc}/${core.length}</span></div>${core.map(row).join('')}
+      <div class="grp"><span>Developing</span><span class="num">${hd}/${dev.length}</span></div>${dev.map(row).join('')}
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Expected minutes</h2>
+    <div class="proj">
+      <div class="core-c"><span class="eyebrow">Core · ${pr.nc} players</span><span class="big num">${rng(pr.core)} <small>min</small></span><span class="help">${pr.coreF && pr.coreF[1] > 0 ? 'Some also play the 5th Q' : 'in the real game'}</span></div>
+      <div class="dev-c"><span class="eyebrow">Developing · ${pr.nd} players</span><span class="big num">${rng(pr.dev)} <small>min</small></span><span class="help">${s.fifth && pr.devF ? '+ ' + rng(pr.devF) + ' min in the 5th Q' : 'in the real game'}</span></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Game format</h2>
+    <div class="card fields">
+      ${field('On the floor in the real game', 'devOnFloor', [[1, '4 core + 1 dev'], [2, '3 core + 2 dev']])}
+      ${field('Core minutes', 'coreMode', [['even', 'Even'], ['balanced', 'Lean top'], ['win', 'Win now']], mode)}
+      ${field('Best core players start the game', 'startStrong', [[true, 'Yes'], [false, 'No']])}
+      ${field('Best core players finish the game', 'finishStrong', [[true, 'Yes'], [false, 'No']])}
+      ${field('Game is played in', 'periods', [[4, '4 quarters'], [2, '2 halves']])}
+      ${field(periodWord(s) + ' length', 'qLen', lenOptions(s).map(v => [v, v + ' min']))}
+      ${field('Sub every', 'subsPerQ', [1, 2, 3, 4].map(n => [n, fmt(s.qLen / n)]), `${s.subsPerQ} line change${s.subsPerQ > 1 ? 's' : ''} per ${pw}, at dead balls near ${Array.from({length:s.subsPerQ}, (_, i) => fmt(s.qLen - i * len)).join(', ')}.`)}
+      ${field('5th quarter before the game', 'fifth', [[true, 'Yes'], [false, 'No']])}
+      ${s.fifth ? field('5th quarter length', 'fifthLen', [[6, '6 min'], [8, '8 min'], [10, '10 min']]) : ''}
+      ${s.fifth ? field('5th quarter sub every', 'fifthSubs', [[1, 'No subs'], [2, fmt(s.fifthLen / 2)]]) : ''}
+    </div>
+  </section>
+
+  ${armBtn('build', 'Build today\'s rotation', 'Replace the rotation in progress?', 'build', building, 'btn primary big')}
+  <p class="help">The 5th quarter goes to the developing players first. In the real game the floor always has ${s.devOnFloor === 1 ? '4 core players and 1 developing player' : '3 core players and 2 developing players'}, and minutes are spread as evenly as that allows.</p>`;
+}
+
+/* ---------- home screen install ---------- */
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+window.addEventListener('appinstalled', () => { installEvt = null; S.installDismissed = true; render(); });
+function isStandalone(){
+  try { return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; }
+}
+function isIOS(){ if (/Android/i.test(navigator.userAgent)) return false; return /iPad|iPhone|iPod/.test(navigator.userAgent) ||(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+const APP_ICON = document.querySelector('.brand svg') ? document.querySelector('.brand svg').outerHTML : '';
+function installCard(){
+  return `<div class="install">${APP_ICON}<p><b>Put this on your home screen</b>Opens like an app and works in the gym with no signal.</p>
+    <div class="acts"><button class="btn primary small" data-act="install">Add</button><button class="btn link small" data-act="installLater">Not now</button></div></div>`;
+}
+const SHARE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+const DOTS_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+function installSteps(){
+  if (isIOS()) return `<h3>Add to Home Screen</h3>
+    <ol class="steps"><li>Tap the Share button ${SHARE_ICON} (bottom of Safari, or top right in Chrome).</li>
+    <li>Scroll down and tap <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b>. Open Titans from your home screen from now on.</li></ol>
+    <p class="help">Your roster and saved games stay on this phone either way.</p>
+    <button class="btn" data-act="closeSheet">Got it</button>`;
+  return `<h3>Add to Home Screen</h3>
+    <ol class="steps"><li>Tap the browser menu ${DOTS_ICON} (top right in Chrome).</li>
+    <li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li><li>Tap <b>Install</b>. Open Titans from your home screen from now on.</li></ol>
+    <button class="btn" data-act="closeSheet">Got it</button>`;
+}
+if ('serviceWorker' in navigator && /^https:|^http:\/\/(localhost|127\.0\.0\.1)/.test(location.href) && !/claude\.ai|claudeusercontent/.test(location.hostname)) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+function armBtn(key, label, armedLabel, act, needConfirm, cls){
+  if (!needConfirm) return `<button class="${cls}" data-act="${act}">${label}</button>`;
+  if (UI.armed === key) return `<button class="${cls} danger" data-act="${act}">${armedLabel}</button>`;
+  return `<button class="${cls}" data-act="arm" data-key="${key}">${label}</button>`;
+}
+
+function liveCard(){
+  const P = S.plan, segs = P.segs, s = P.s;
+  if (P.cur == null){
+    return `<div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="eyebrow">Game time</span><p class="help" style="margin-top:4px">Step through the game one sub at a time. If a player gets hurt, tap their name and the rest of the game re-balances around them.</p></div>
+      <button class="btn primary big" data-act="liveStart">Start live mode</button></div>`;
+  }
+  if (P.cur >= segs.length){
+    return `<div class="live"><span class="eyebrow">Final</span><div class="live-clock"><b>Game over</b></div>
+      <p style="margin:0;color:var(--head-muted)">Save the minutes below so the next game balances anyone who sat more today.</p>
+      <div class="live-nav"><button class="btn" data-act="livePrev">Back</button><button class="btn go" data-act="saveGame">${P.savedId ? 'Update season' : 'Save to season'}</button></div>
+      <button class="live-exit" data-act="liveExit">Exit live mode</button></div>`;
+  }
+  const g = segs[P.cur], nx = segs[P.cur + 1];
+  let nextHTML;
+  if (!nx){
+    nextHTML = `<div class="next"><span class="eyebrow">Last stretch</span><span>No more subs. Finish strong.</span></div>`;
+  } else {
+    const {ins, outs} = changes(g, nx);
+    const when = nx.kind !== g.kind ? 'Tip-off · ' + Engine.segLabel(nx, s) + ' ' + fmt(nx.start) : Engine.segLabel(nx, s) + ' at ' + fmt(nx.start);
+    nextHTML = `<div class="next"><span class="eyebrow">Next sub · ${when}</span>
+      ${nx.kind !== g.kind ? `<div class="io"><div><b class="in">START</b> ${sortIds(nx.lineup).map(id => esc(pname(id))).join(', ')}</div></div>` :
+        (ins.length ? `<div class="io"><div><b class="in">IN</b> ${ins.map(id => esc(pname(id))).join(', ')}</div><div><b class="outx">OUT</b> ${outs.map(id => esc(pname(id))).join(', ')}</div></div>` : '<span>Same five stay on.</span>')}</div>`;
+  }
+  return `<div class="live" aria-live="polite">
+    <div class="live-top"><span class="eyebrow">On the floor now</span><span class="eyebrow num">${P.cur + 1} of ${segs.length}</span></div>
+    <div class="live-clock"><b>${Engine.segLabel(g, s)}</b><span class="num">${fmt(g.start)}–${fmt(g.end)}</span></div>
+    <div class="floor">${sortIds(g.lineup).map(id => { const p = byId(id); return `<button class="floor-p" data-act="pick" data-seg="${P.cur}" data-id="${id}">
+      <span class="jn">${p && p.num ? esc(p.num) : '–'}</span><span class="fn">${esc(p ? p.name : 'Removed')}</span><span class="tag ${p ? p.tier : ''}">${p ? tierWord(p.tier) : ''}</span></button>`; }).join('')}</div>
+    ${nextHTML}
+    <div class="live-nav"><button class="btn" data-act="livePrev" ${P.cur === 0 ? 'disabled' : ''}>Back</button><button class="btn go" data-act="liveNext">${nx ? 'Next sub ›' : 'End game ›'}</button></div>
+    ${P.out.length ? `<div class="outlist"><span>Out:</span>${P.out.map(id => `<button data-act="returnIn" data-id="${id}">${esc(pname(id, false))} · put back</button>`).join('')}</div>` : ''}
+    <button class="live-exit" data-act="liveExit">Exit live mode</button>
+  </div>`;
+}
+
+function gridHTML(){
+  const P = S.plan, segs = P.segs, s = P.s, m = Engine.minutes(segs);
+  const groups = [];
+  segs.forEach((g, i) => {
+    const lab = Engine.segLabel(g, s);
+    if (groups.length && groups[groups.length - 1].lab === lab) groups[groups.length - 1].n++;
+    else groups.push({lab, n:1, i});
+  });
+  const firstOf = new Set(groups.map(g => g.i));
+  const R = ranked().filter(p => P.present.includes(p.id));
+  const row = p => {
+    const mm = m[p.id] || {g:0, f:0};
+    const out = P.out.includes(p.id);
+    return `<tr class="${out ? 'isout' : ''}"><td class="pcol">${nameHTML(p.id)}${out ? ' <span class="tag out">Out</span>' : ''}</td>${segs.map((g, i) =>
+      `<td class="cell ${g.lineup.includes(p.id) ? 'on ' + p.tier : ''} ${i === P.cur ? 'cur' : ''} ${firstOf.has(i) && i > 0 ? 'gsep' : ''}"><i></i></td>`).join('')}
+      ${s.fifth ? `<td class="mcol f num">${mins(mm.f)}</td>` : ''}<td class="mcol num">${mins(mm.g)}</td></tr>`;
+  };
+  const span = segs.length + 1 + (s.fifth ? 2 : 1);
+  const core = R.filter(p => p.tier === 'core'), dev = R.filter(p => p.tier !== 'core');
+  return `<div class="grid-wrap"><table class="rgrid">
+    <thead><tr><th class="pcol" rowspan="2">Player</th>${groups.map(g => `<th colspan="${g.n}" class="${g.i > 0 ? 'gsep' : ''}">${g.lab}</th>`).join('')}
+      ${s.fifth ? '<th class="mcol" rowspan="2">5th</th>' : ''}<th class="mcol" rowspan="2">Game</th></tr>
+    <tr>${segs.map((g, i) => `<th class="num ${firstOf.has(i) && i > 0 ? 'gsep' : ''} ${i === P.cur ? 'cur' : ''}">${fmt(g.start)}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${core.length ? `<tr class="sep"><td class="pcol">Core</td><td colspan="${span - 1}"></td></tr>` + core.map(row).join('') : ''}
+      ${dev.length ? `<tr class="sep"><td class="pcol">Developing</td><td colspan="${span - 1}"></td></tr>` + dev.map(row).join('') : ''}
+    </tbody></table></div>
+    <div class="legend"><span><i style="background:var(--core)"></i>Core on floor</span><span><i style="background:var(--dev)"></i>Developing on floor</span><span><i style="background:var(--cell-off)"></i>Bench</span>${P.cur != null ? '<span><i style="background:var(--cur-col);outline:1px solid var(--line)"></i>Now</span>' : ''}</div>`;
+}
+
+function segCards(){
+  const P = S.plan, s = P.s;
+  return P.segs.map((g, i) => {
+    const prev = P.segs[i - 1];
+    let chg;
+    if (g.kind === 'fifth' && (!prev || prev.kind !== 'fifth')) chg = '<span>5th quarter group · score doesn\'t count</span>';
+    else if (!prev || prev.kind !== g.kind) chg = '<span>Starting five</span>';
+    else {
+      const {ins, outs} = changes(prev, g);
+      chg = ins.length ? `<span><b class="in">IN</b> ${ins.map(id => esc(pname(id, false))).join(', ')}</span> &nbsp; <span><b class="outx">OUT</b> ${outs.map(id => esc(pname(id, false))).join(', ')}</span>` : '<span>No change</span>';
+    }
+    const state = P.cur == null ? '' : i === P.cur ? 'now' : i < P.cur ? 'past' : '';
+    return `<article class="segcard ${state}">
+      <header><span class="sl">${Engine.segLabel(g, s)}</span><span class="ck num">${fmt(g.start)}–${fmt(g.end)}</span>
+        ${g.locked ? `<span class="ed">Edited <button class="btn link small" data-act="unlock" data-seg="${i}">Undo</button></span>` : ''}</header>
+      <div class="chg">${chg}</div>
+      <div class="chips">${sortIds(g.lineup).map(id => { const p = byId(id); return `<button class="chip ${p ? p.tier : ''}" data-act="pick" data-seg="${i}" data-id="${id}">${p && p.num ? `<small>#${esc(p.num)}</small>` : ''}${esc(p ? p.name : 'Removed')}</button>`; }).join('')}</div>
+    </article>`;
+  }).join('');
+}
+
+function viewRotation(){
+  const P = S.plan;
+  if (!P) return `<div class="card empty"><h3>No rotation yet</h3><p>Pick who's here and the game format, then build today's rotation.</p><button class="btn primary" data-act="tab" data-tab="today">Go to Today</button></div>`;
+  const stale = P.key !== planKey() && P.cur == null;
+  return `
+  ${stale ? `<div class="note"><span><b>Out of date.</b> Players or settings changed after this was built.</span><button class="btn small" data-act="build">Rebuild</button></div>` : ''}
+  ${liveCard()}
+  <section class="block">
+    <div class="block-head"><h2>Minutes</h2><p class="sub">Tap any name below to swap or mark hurt</p></div>
+    ${gridHTML()}
+  </section>
+  <section class="block">
+    <h2>Sub sheet</h2>
+    <div class="segs">${segCards()}</div>
+  </section>
+  <section class="block">
+    <h2>After the game</h2>
+    <div class="card fields">
+      <div class="field"><label class="flabel" for="opp">Opponent (optional)</label><input class="in-txt" id="opp" data-plan-field="opp" value="${esc(P.opp)}" placeholder="e.g. Shore Shooters" autocomplete="off"></div>
+      <div class="row-actions"><button class="btn primary" data-act="saveGame">${P.savedId ? 'Update season minutes' : 'Save minutes to season'}</button><button class="btn" data-act="copyPlan">Copy sub sheet</button></div>
+      ${armBtn('rebuild', 'Start over from Today settings', 'Erase edits and rebuild?', 'build', P.cur != null || P.segs.some(g => g.locked) || P.out.length, 'btn')}
+    </div>
+  </section>`;
+}
+
+function viewRoster(){
+  const R = ranked();
+  const up = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
+  const dn = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  return `
+  <section class="block">
+    <div class="block-head"><h2>Roster</h2><p class="sub">Ranked best to newest. Rank breaks ties.</p></div>
+    <div class="card team-in"><label class="flabel" for="team">Team name</label><input class="in-txt" id="team" data-team value="${esc(S.team)}" autocomplete="off"></div>
+    <div class="rlist">${R.map((p, i) => `<div class="rrow">
+      <div class="rk-ctl"><button class="ib" data-act="move" data-id="${p.id}" data-dir="-1" aria-label="Move ${esc(p.name)} up" ${i === 0 ? 'disabled' : ''}>${up}</button><span>${i + 1}</span><button class="ib" data-act="move" data-id="${p.id}" data-dir="1" aria-label="Move ${esc(p.name)} down" ${i === R.length - 1 ? 'disabled' : ''}>${dn}</button></div>
+      <input class="in-txt num" id="num-${p.id}" data-pf="num" data-id="${p.id}" value="${esc(p.num)}" placeholder="#" inputmode="numeric" maxlength="3" aria-label="Jersey number">
+      <input class="in-txt" id="name-${p.id}" data-pf="name" data-id="${p.id}" value="${esc(p.name)}" aria-label="Player name" autocomplete="off">
+      <select class="in-sel" id="tier-${p.id}" data-pf="tier" data-id="${p.id}" aria-label="Level"><option value="core" ${p.tier === 'core' ? 'selected' : ''}>Core</option><option value="dev" ${p.tier !== 'core' ? 'selected' : ''}>Developing</option></select>
+      ${UI.armed === 'del-' + p.id ? `<button class="del armed" data-act="delPlayer" data-id="${p.id}">Remove</button>` : `<button class="del" data-act="arm" data-key="del-${p.id}" aria-label="Remove ${esc(p.name)}">×</button>`}
+      <input class="in-txt note-in" id="note-${p.id}" data-pf="note" data-id="${p.id}" value="${esc(p.note || '')}" placeholder="Strengths / role (e.g. best rebounder)" aria-label="Notes for ${esc(p.name)}" autocomplete="off">
+    </div>`).join('')}</div>
+    <div class="row-actions"><button class="btn" data-act="addPlayer">Add player</button>${armBtn('reset', 'Reset to sample roster', 'Erase roster and season?', 'resetAll', true, 'btn')}</div>
+    ${isStandalone() ? '' : '<button class="btn" data-act="install">Add to Home Screen</button>'}
+    <p class="help"><b>Core</b> players make up most of the floor in the real game. <b>Developing</b> players get the 5th quarter plus a share of the one developing spot on the floor. Everything is saved on this phone.</p>
+  </section>`;
+}
+
+function viewSeason(){
+  const H = S.history;
+  if (!H.length) return `<div class="card empty"><h3>No games saved yet</h3><p>After a game, tap “Save minutes to season” on the Rotation tab. Saved minutes are used to even things out the next game.</p></div>`;
+  const R = ranked();
+  const stat = {};
+  H.forEach(g => Object.entries(g.mins || {}).forEach(([id, m]) => { const t = stat[id] = stat[id] || {gp:0, g:0, f:0}; t.gp++; t.g += m.g; t.f += m.f; }));
+  const rows = R.map(p => { const t = stat[p.id] || {gp:0, g:0, f:0}; return `<tr><td>${nameHTML(p.id)}</td><td>${t.gp}</td><td>${t.gp ? mins(t.g / t.gp) : '–'}</td><td>${t.gp ? mins(t.f / t.gp) : '–'}</td><td>${mins(t.g + t.f)}</td></tr>`; }).join('');
+  return `
+  <section class="block">
+    <div class="block-head"><h2>Season minutes</h2><p class="sub num">${H.length} game${H.length > 1 ? 's' : ''} saved</p></div>
+    <div class="grid-wrap"><table class="stable"><thead><tr><th>Player</th><th>GP</th><th>Avg game</th><th>Avg 5th</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>
+  <section class="block">
+    <h2>Games</h2>
+    <div class="games">${H.slice().reverse().map(g => `<div class="game"><div><b>${g.opp ? 'vs ' + esc(g.opp) : 'Game'}</b> <span class="num">${esc(g.date)}</span><br><span>${Object.keys(g.mins || {}).length} players</span></div>
+      ${UI.armed === 'g-' + g.id ? `<button class="btn small danger" data-act="delGame" data-id="${g.id}">Delete</button>` : `<button class="btn small" data-act="arm" data-key="g-${g.id}">Delete</button>`}</div>`).join('')}</div>
+  </section>
+  <section class="block">
+    <h2>Backup</h2>
+    <div class="card fields">
+      <p class="help">Data lives on this phone only. Copy a backup code to move it to another phone or keep it safe.</p>
+      <button class="btn" data-act="copyBackup">Copy backup code</button>
+      <label class="flabel" for="restore">Restore from a backup code</label>
+      <textarea class="in-txt" id="restore" placeholder="Paste backup code here"></textarea>
+      <button class="btn" data-act="restore">Restore</button>
+    </div>
+  </section>`;
+}
+
+/* ---------- sheet ---------- */
+function sheetHTML(){
+  const sh = UI.sheet;
+  if (sh.type === 'pick'){
+    const P = S.plan, g = P.segs[sh.seg], m = Engine.minutes(P.segs);
+    const bench = ranked().filter(p => P.present.includes(p.id) && !P.out.includes(p.id) && !g.lineup.includes(p.id));
+    const me = byId(sh.id), mm = m[sh.id] || {g:0, f:0};
+    return `<h3>${esc(pname(sh.id))}</h3>
+      <p class="help">${Engine.segLabel(g, P.s)} ${fmt(g.start)}–${fmt(g.end)} · ${mins(mm.g)} min planned in the game${P.s.fifth ? ', ' + mins(mm.f) + ' in the 5th Q' : ''}</p>
+      ${bench.length ? `<div class="field"><span class="eyebrow">Swap in for this stretch</span><div class="opts">${bench.map(b => { const bm = m[b.id] || {g:0, f:0}; return `<button class="opt" data-act="swap" data-seg="${sh.seg}" data-out="${sh.id}" data-in="${b.id}"><span>${nameHTML(b.id)}${b.note ? `<em>${esc(b.note)}</em>` : ''}</span><span class="tag ${b.tier}">${tierWord(b.tier)}</span><small class="num">${mins(bm.g)} min</small></button>`; }).join('')}</div>
+      <p class="help">Swapping locks this stretch. The rest of the game re-balances.</p></div>` : '<p class="help">Nobody is on the bench to swap in.</p>'}
+      ${me ? `<button class="opt-danger" data-act="markOut" data-id="${sh.id}">Hurt / out for the rest of the game</button>` : ''}
+      <button class="btn" data-act="closeSheet">Cancel</button>`;
+  }
+  if (sh.type === 'install') return installSteps();
+  if (sh.type === 'copy'){
+    return `<h3>Copy</h3><p class="help">Your phone didn't allow automatic copying. Select the text and copy it.</p>
+      <textarea class="in-txt" id="copybox" style="height:220px" readonly>${esc(sh.text)}</textarea>
+      <button class="btn" data-act="closeSheet">Done</button>`;
+  }
+  return '';
+}
+
+/* ---------- render ---------- */
+function render(){
+  $('#teamName').textContent = S.team || 'Team';
+  const here = S.roster.filter(p => isHere(p.id)).length;
+  $('#topPill').innerHTML = `<b class="num">${here}</b> of ${S.roster.length} here`;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab ? 'page' : 'false'));
+  const v = {today:viewToday, rotation:viewRotation, roster:viewRoster, season:viewSeason}[S.tab] || viewToday;
+  $('#app').innerHTML = v();
+  const sh = $('#sheet');
+  if (UI.sheet){
+    sh.innerHTML = `<button class="sheet-bg" data-act="closeSheet" aria-label="Close"></button><div class="sheet-panel" role="dialog" aria-modal="true">${sheetHTML()}</div>`;
+    sh.hidden = false;
+  } else { sh.hidden = true; sh.innerHTML = ''; }
+  save();
+}
+
+/* ---------- clipboard ---------- */
+function copyText(text, okMsg){
+  const fallback = () => { UI.sheet = {type:'copy', text}; render(); const b = $('#copybox'); if (b){ b.focus(); b.select(); } };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast(okMsg), fallback);
+    else fallback();
+  } catch (e) { fallback(); }
+}
+function planText(){
+  const P = S.plan, s = P.s, m = Engine.minutes(P.segs);
+  const lines = [`${S.team}${P.opp ? ' vs ' + P.opp : ''} — sub sheet`];
+  P.segs.forEach((g, i) => {
+    const prev = P.segs[i - 1];
+    let line = `${Engine.segLabel(g, s)} ${fmt(g.start)}-${fmt(g.end)}: `;
+    if (!prev || prev.kind !== g.kind) line += sortIds(g.lineup).map(id => pname(id)).join(', ');
+    else { const {ins, outs} = changes(prev, g); line += ins.length ? `IN ${ins.map(id => pname(id)).join(', ')} / OUT ${outs.map(id => pname(id)).join(', ')}` : 'no change'; }
+    lines.push(line);
+  });
+  lines.push('', 'Minutes (game' + (s.fifth ? ' + 5th Q' : '') + '):');
+  ranked().filter(p => P.present.includes(p.id)).forEach(p => { const mm = m[p.id] || {g:0, f:0}; lines.push(`${pname(p.id)}: ${mins(mm.g)}${s.fifth ? ' + ' + mins(mm.f) : ''}`); });
+  return lines.join('\n');
+}
+
+/* ---------- wake lock for live mode ---------- */
+let wake = null;
+async function keepAwake(on){
+  try {
+    if (on && 'wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => wake = null); }
+    if (!on && wake) { await wake.release(); wake = null; }
+  } catch (e) { wake = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.plan && S.plan.cur != null && S.tab === 'rotation') keepAwake(true); });
+
+/* ---------- actions ---------- */
+const A = {
+  tab(d){ S.tab = d.tab; UI.sheet = null; window.scrollTo(0, 0); },
+  toggleHere(d){ S.here[d.id] = !isHere(d.id); },
+  set(d){
+    const v = JSON.parse(d.val);
+    S.settings[d.key] = v;
+    if (d.key === 'periods' && !lenOptions(S.settings).includes(S.settings.qLen)) S.settings.qLen = v === 2 ? 14 : 7;
+  },
+  arm(d){ UI.armed = d.key; return 'keepArm'; },
+  build(){ buildPlan(); S.tab = 'rotation'; window.scrollTo(0, 0); toast('Rotation built'); },
+  liveStart(){ S.plan.cur = 0; keepAwake(true); window.scrollTo(0, 0); },
+  liveNext(){ S.plan.cur = Math.min(S.plan.segs.length, S.plan.cur + 1); if (S.plan.cur >= S.plan.segs.length) keepAwake(false); },
+  livePrev(){ S.plan.cur = Math.max(0, S.plan.cur - 1); },
+  liveExit(){ S.plan.cur = null; keepAwake(false); },
+  install(){
+    if (installEvt){
+      const ev = installEvt; installEvt = null;
+      ev.prompt();
+      ev.userChoice.then(c => { if (c.outcome === 'accepted'){ S.installDismissed = true; render(); } }).catch(() => {});
+      return 'noRender';
+    }
+    UI.sheet = {type:'install'};
+  },
+  installLater(){ S.installDismissed = true; },
+  pick(d){ UI.sheet = {type:'pick', seg:+d.seg, id:d.id}; },
+  closeSheet(){ UI.sheet = null; },
+  swap(d){
+    const g = S.plan.segs[+d.seg];
+    g.lineup = g.lineup.map(x => x === d.out ? d.in : x);
+    g.locked = true;
+    replan(); UI.sheet = null; toast(`${pname(d.in, false)} in for ${pname(d.out, false)}`);
+  },
+  unlock(d){ S.plan.segs[+d.seg].locked = false; replan(); },
+  markOut(d){
+    const P = S.plan;
+    if (!P.out.includes(d.id)) P.out.push(d.id);
+    const from = P.cur == null ? 0 : P.cur;
+    P.segs.forEach((g, i) => { if (i >= from && g.locked && g.lineup.includes(d.id)) g.locked = false; });
+    replan(); UI.sheet = null; toast(`${pname(d.id, false)} is out. Minutes re-balanced.`);
+  },
+  returnIn(d){ S.plan.out = S.plan.out.filter(x => x !== d.id); replan(); toast(`${pname(d.id, false)} is back in the rotation`); },
+  saveGame(){
+    const P = S.plan, m = Engine.minutes(P.segs), out = {};
+    P.present.forEach(id => { if (byId(id)) out[id] = m[id] || {g:0, f:0}; });
+    const entry = {id:P.savedId || uid(), date:new Date().toLocaleDateString('en-CA'), opp:P.opp || '', mins:out};
+    const i = S.history.findIndex(g => g.id === entry.id);
+    if (i >= 0) { entry.date = S.history[i].date; S.history[i] = entry; } else S.history.push(entry);
+    P.savedId = entry.id;
+    toast('Saved to season');
+  },
+  copyPlan(){ copyText(planText(), 'Sub sheet copied'); return 'noRender'; },
+  move(d){
+    const i = S.roster.findIndex(p => p.id === d.id), j = i + (+d.dir);
+    if (j < 0 || j >= S.roster.length) return;
+    [S.roster[i], S.roster[j]] = [S.roster[j], S.roster[i]];
+    S.sample = false;
+  },
+  addPlayer(){ S.roster.push({id:uid(), name:'New player', num:'', tier:'dev'}); S.sample = false; },
+  delPlayer(d){ S.roster = S.roster.filter(p => p.id !== d.id); delete S.here[d.id]; S.sample = false; },
+  resetAll(){ const t = S.tab; S = fresh(); S.tab = t; },
+  delGame(d){ S.history = S.history.filter(g => g.id !== d.id); },
+  copyBackup(){ copyText(JSON.stringify({team:S.team, roster:S.roster, settings:S.settings, history:S.history}), 'Backup code copied'); return 'noRender'; },
+  restore(){
+    const box = $('#restore');
+    try {
+      const d = JSON.parse(box.value.trim());
+      if (!Array.isArray(d.roster) || !d.roster.length) throw new Error('no roster');
+      S.team = d.team || S.team; S.roster = d.roster; S.settings = {...DEFAULT_SETTINGS, ...(d.settings || {})};
+      S.history = Array.isArray(d.history) ? d.history : []; S.plan = null; S.sample = false; S.here = {};
+      toast('Backup restored');
+    } catch (e) { toast('That code didn\'t work. Copy the whole backup code and try again.'); return 'noRender'; }
+  },
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) { if (UI.armed && !e.target.closest('input,textarea,select')) { UI.armed = null; render(); } return; }
+  const fn = A[el.dataset.act];
+  if (!fn) return;
+  const r = fn(el.dataset, el);
+  if (r !== 'keepArm') UI.armed = null;
+  if (r !== 'noRender') render();
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.pf && t.dataset.pf !== 'tier'){
+    const p = byId(t.dataset.id); if (p){ p[t.dataset.pf] = t.value; S.sample = false; save(); }
+  } else if (t.dataset.team !== undefined){ S.team = t.value; $('#teamName').textContent = t.value || 'Team'; save(); }
+  else if (t.dataset.planField && S.plan){ S.plan[t.dataset.planField] = t.value; save(); }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.pf === 'tier'){ const p = byId(t.dataset.id); if (p){ p.tier = t.value; S.sample = false; render(); } }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && UI.sheet){ UI.sheet = null; render(); } });
+
+render();
+</script>
+</body></html>
