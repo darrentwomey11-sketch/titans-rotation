@@ -272,16 +272,45 @@ textarea.in-txt{height:96px;padding:8px 10px;font-family:ui-monospace,Menlo,mono
 .opt-danger{background:var(--bad-soft);color:var(--bad);border:1px solid transparent;border-radius:10px;min-height:48px;font-weight:700;width:100%}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:13.5px;font-weight:600;box-shadow:0 6px 20px rgb(0 0 0 / .25);max-width:calc(100% - 32px)}
 
+/* live: scoreboard + situations */
+.scorebox{background:rgb(255 255 255 / .07);border:1px solid rgb(255 255 255 / .16);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sb-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sb-m{font-family:var(--font-display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.03em}
+.sb-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:8px}
+.sb-row label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sb-row label span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--head-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-row input{width:100%;height:52px;border-radius:10px;border:1px solid rgb(255 255 255 / .28);background:rgb(255 255 255 / .1);color:var(--head-ink);text-align:center;font-family:var(--font-display);font-weight:800;font-size:30px}
+.sb-row input::placeholder{color:rgb(255 255 255 / .3)}
+.sb-dash{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--head-muted);padding-bottom:8px}
+.situ{border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;border:1px solid}
+.situ.close{background:rgb(240 124 56 / .16);border-color:rgb(240 124 56 / .5)}
+.situ.dev{background:rgb(154 128 240 / .18);border-color:rgb(154 128 240 / .55)}
+.situ > b{font-size:15px}
+.five{display:flex;flex-wrap:wrap;gap:6px}
+.five span{border-radius:999px;padding:4px 10px;font-size:14px;font-weight:600;background:rgb(255 255 255 / .1)}
+.five span.new{background:#fff;color:#13203a}
+.situ .btn{background:#fff;color:#13203a;border-color:#fff;align-self:flex-start}
+.segcard .res{font-family:var(--font-display);font-weight:800;font-size:17px;color:var(--muted)}
+.segcard .res small{font-weight:600;font-size:13px;color:var(--muted)}
+.segcard .res.pos{color:var(--ok)}
+.segcard .res.neg{color:var(--bad)}
+.lus{display:flex;flex-direction:column;gap:6px}
+.lu{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.lu-n{display:flex;flex-wrap:wrap;gap:4px 10px;font-weight:600;font-size:13.5px}
+.lu-n .dev{color:var(--dev-ink)}
+.lu-n .flex{color:var(--flex-ink)}
+.lu-s{display:flex;gap:12px;font-size:12.5px;color:var(--muted);align-items:baseline}
+.lu-s b{font-size:14px;color:var(--ink)}
+.lu-s b.pos{color:var(--ok)}
+.lu-s b.neg{color:var(--bad)}
+.sitsum{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+
 /* live: late-sub chips, table cue, score */
 .cue{font-size:12.5px;color:var(--head-muted)}
 .late{display:flex;flex-direction:column;gap:6px}
 .late-row{display:flex;flex-wrap:wrap;gap:6px}
 .late-row button{flex:1 1 56px;min-height:44px;border-radius:10px;background:rgb(255 255 255 / .08);border:1px solid rgb(255 255 255 / .2);color:var(--head-ink);font-family:var(--font-display);font-weight:700;font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .late-row button small{font-family:var(--font-body);font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--head-muted);margin-top:2px}
-.score-in{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
-.score-in .eyebrow small{font-weight:500;letter-spacing:0;text-transform:none}
-.score-in label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--head-muted);max-width:120px;white-space:nowrap;overflow:hidden}
-.score-in input{width:52px;height:40px;border-radius:8px;border:1px solid rgb(255 255 255 / .25);background:rgb(255 255 255 / .1);color:var(--head-ink);text-align:center;font-family:var(--font-display);font-weight:700;font-size:20px;flex:none}
 .stable tr.thin td{opacity:.55}
 .stable td .tag{margin-left:4px;vertical-align:1px}
 
@@ -331,53 +360,6 @@ const Engine = (() => {
       for (let i = 0; i < n; i++) segs.push({kind:'game', q, part:i, len, start:s.qLen - i*len, end:s.qLen - (i+1)*len, pEnd:s.qLen - (i+1)*len, lineup:[], locked:false});
     }
     return segs;
-  }
-
-  /*
-   Re-order who plays which stretch without changing anyone's minutes, so subs are easy to run:
-   mid-quarter subs swap as few players as possible (big changes wait for quarter breaks),
-   and no core or flex player sits more than a quarter in a row if it can be helped.
-   Only swaps two players of the same group between two stretches of the same length.
-  */
-  function polish(segs, gameIdx, movable, groups, s){
-    const goodIds = groups[0].map(p => p.id);
-    const maxSit = s.qLen + 0.01;
-    const cost = () => {
-      let c = 0;
-      for (let k = 1; k < gameIdx.length; k++){
-        const a = segs[gameIdx[k-1]], b = segs[gameIdx[k]];
-        const ins = b.lineup.filter(x => !a.lineup.includes(x)).length;
-        c += a.q === b.q ? 3 * ins + 20 * Math.max(0, ins - 2) : ins;
-      }
-      goodIds.forEach(id => {
-        let run = 0;
-        gameIdx.forEach(i => { if (segs[i].lineup.includes(id)) run = 0; else { run += segs[i].len; if (run > maxSit) c += 4; } });
-      });
-      return c;
-    };
-    let best = cost();
-    for (let pass = 0; pass < 40; pass++){
-      let improved = false;
-      groups.forEach((grp, gi) => {
-        const ids = new Set(grp.map(p => p.id));
-        const idx = gameIdx.filter(i => movable(i, gi));
-        for (let x = 0; x < idx.length; x++) for (let y = x + 1; y < idx.length; y++){
-          const A = segs[idx[x]], B = segs[idx[y]];
-          if (Math.abs(A.len - B.len) > 1e-6) continue;
-          const onA = A.lineup.filter(id => ids.has(id) && !B.lineup.includes(id));
-          const onB = B.lineup.filter(id => ids.has(id) && !A.lineup.includes(id));
-          for (const a of onA) for (const b of onB){
-            if (!A.lineup.includes(a) || !B.lineup.includes(b) || A.lineup.includes(b) || B.lineup.includes(a)) continue;
-            A.lineup = A.lineup.map(z => z === a ? b : z);
-            B.lineup = B.lineup.map(z => z === b ? a : z);
-            const c = cost();
-            if (c < best - 1e-9){ best = c; improved = true; }
-            else { A.lineup = A.lineup.map(z => z === b ? a : z); B.lineup = B.lineup.map(z => z === a ? b : z); }
-          }
-        }
-      });
-      if (!improved) break;
-    }
   }
 
   function coreWeight(mode, r, n){
@@ -457,6 +439,8 @@ const Engine = (() => {
     const pick = (group, k, i, isDev) => {
       const prev = i > 0 && segs[i-1].kind === 'game' ? new Set(segs[i-1].lineup) : new Set();
       return group.slice().sort((a, b) => {
+        // A developing player never stays on for two stretches in a row (no full quarter) if another one can go in.
+        if (isDev){ const ra = prev.has(a.id) ? 1 : 0, rb = prev.has(b.id) ? 1 : 0; if (ra !== rb) return ra - rb; }
         const na = target[a.id] - got[a.id] - base[a.id], nb = target[b.id] - got[b.id] - base[b.id];
         if (Math.abs(na - nb) > 0.01) return nb - na;
         const pa = prev.has(a.id) ? 1 : 0, pb = prev.has(b.id) ? 1 : 0;
@@ -476,10 +460,6 @@ const Engine = (() => {
       const dIds = pick(dev, d, i, true);
       dIds.forEach(id => got[id] += g.len);
       g.lineup = [...cIds, ...dIds];
-    }
-    if (opts.polish !== false){
-      const fixedSet = new Set(Object.keys(fixed).map(Number));
-      polish(segs, gameIdx, (i, gi) => free.includes(i) && !(gi === 0 && fixedSet.has(i)), [core, dev], s);
     }
 
     // 5th quarter. Developing players share it so their totals (game + 5th) come out as even as possible.
@@ -548,7 +528,7 @@ const Engine = (() => {
 
 <script>
 const KEY = 'titans-rotation-v1';
-const DEFAULT_SETTINGS = {periods:4, qLen:7, subsPerQ:2, fifth:true, fifthLen:8, fifthSubs:4, flexFifth:'auto', devOnFloor:1, coreMode:'balanced', startStrong:true, finishStrong:true};
+const DEFAULT_SETTINGS = {periods:4, qLen:7, subsPerQ:2, fifth:true, fifthLen:8, fifthSubs:4, flexFifth:'auto', devOnFloor:1, coreMode:'balanced', startStrong:true, finishStrong:true, suggest:true, closeWithin:6, bigLead:15};
 const uid = () => 'p' + Math.random().toString(36).slice(2, 9);
 const TEAM_ROSTER = [
   ['Ellie',   'core', 'Strong ball handler, drives to the hoop'],
@@ -663,10 +643,6 @@ function avgSlip(){
   S.history.forEach(g => (g.slips || []).forEach(x => all.push(x)));
   return all.length >= 3 ? all.reduce((a, b) => a + b, 0) / all.length : null;
 }
-function aimLead(){
-  const a = avgSlip();
-  return a == null ? 0.25 : Math.max(0, Math.min(1, Math.round(a * 4) / 4));
-}
 // Who replaces a player who gets hurt during the stretch on the floor right now: same group (core/flex or developing) if possible.
 function bestReplacement(cur, outId){
   const P = S.plan, g = P.segs[cur];
@@ -688,13 +664,83 @@ function stintMargins(segs){
     let d = null;
     if (g.sc && prev){ d = (g.sc.us - prev.us) - (g.sc.them - prev.them); }
     prev = g.sc || null;
-    return {l:g.lineup.slice(), len:Math.round(g.len * 100) / 100, d};
+    return {l:g.lineup.slice(), len:Math.round(g.len * 100) / 100, d, ...(g.situ ? {s:g.situ} : {})};
   });
 }
 function readScore(){
   const sc = S.plan.score || {};
   const us = parseInt(sc.us, 10), them = parseInt(sc.them, 10);
   return Number.isFinite(us) && Number.isFinite(them) ? {us, them} : null;
+}
+
+/* ---------- game situations: close games get the strongest five, lopsided ones get development minutes ---------- */
+// Season on/off margin per quarter for a player, or null with too little data.
+function impactOf(id){
+  const q = S.settings.qLen || 7;
+  let on = 0, od = 0, off = 0, fd = 0;
+  S.history.forEach(g => (g.stints || []).forEach(t => {
+    if (t.d == null || !(id in (g.mins || {}))) return;
+    if (t.l.includes(id)){ on += t.len; od += t.d; } else { off += t.len; fd += t.d; }
+  }));
+  return on >= 3 * q && off >= q ? (od / on - fd / off) * q : null;
+}
+function situation(){
+  const P = S.plan, s = P.s, g = P.segs[P.cur], nx = P.segs[P.cur + 1];
+  if (!S.settings.suggest || !nx || nx.kind !== 'game' || g.kind !== 'game') return null;
+  const sc = readScore(); if (!sc) return null;
+  const m = sc.us - sc.them;
+  const total = s.periods * s.qLen, left = (s.periods - nx.q) * s.qLen + nx.start;
+  const close = S.settings.closeWithin, big = S.settings.bigLead;
+  if (Math.abs(m) <= close && left <= total * 0.375 + 0.01) return {kind:'close', m, left};
+  if ((m >= big && left <= total - s.qLen + 0.01) || (m >= big - 5 && left <= s.qLen + 0.01) || (m <= -(big + 5) && left <= total / 2 + 0.01)) return {kind:'dev', m, left};
+  return null;
+}
+// The five suggested for the next stretch, or null when the plan already matches.
+function suggestion(sit){
+  const P = S.plan, g = P.segs[P.cur], nx = P.segs[P.cur + 1];
+  const avail = ranked().filter(p => P.present.includes(p.id) && !P.out.includes(p.id));
+  const isGood = p => tierOf(p) !== 'dev';
+  const good = avail.filter(isGood).sort((a, b) => (tierOf(a) === 'flex') - (tierOf(b) === 'flex') || a.rank - b.rank);
+  const devs = avail.filter(p => !isGood(p));
+  const nGood = nx.lineup.filter(id => { const p = byId(id); return p && isGood(p); }).length;
+  let five;
+  if (sit.kind === 'close'){
+    // Top-ranked core players, plus the developing player the team does best with (rank breaks ties).
+    const bestDev = devs.slice().sort((a, b) => ((impactOf(b.id) ?? -99) - (impactOf(a.id) ?? -99)) || a.rank - b.rank);
+    five = [...good.slice(0, nGood).map(p => p.id), ...bestDev.slice(0, 5 - Math.min(nGood, good.length)).map(p => p.id)];
+  } else {
+    // Rest the busiest core player for a second developing player; Stella (flex) in for the next-busiest if she's sitting.
+    const played = {};
+    P.segs.slice(0, P.cur + 1).forEach(x => { if (x.kind === 'game') x.lineup.forEach(id => played[id] = (played[id] || 0) + x.len); });
+    const season = seasonAvg();
+    five = nx.lineup.slice();
+    const coreOn = five.filter(id => { const p = byId(id); return p && tierOf(p) === 'core'; }).sort((a, b) => (played[b] || 0) - (played[a] || 0) || rankOf(a) - rankOf(b));
+    const freshDev = devs.filter(p => !five.includes(p.id) && !g.lineup.includes(p.id)).concat(devs.filter(p => !five.includes(p.id) && g.lineup.includes(p.id)))
+      .sort((a, b) => (g.lineup.includes(a.id) - g.lineup.includes(b.id)) || ((played[a.id] || 0) - (played[b.id] || 0)) || ((season[a.id] || 0) - (season[b.id] || 0)) || b.rank - a.rank);
+    const devCount = five.filter(id => { const p = byId(id); return p && !isGood(p); }).length;
+    if (devCount < 2 && coreOn.length && freshDev.length) five = five.map(id => id === coreOn[0] ? freshDev[0].id : id);
+    const flexOff = good.filter(p => tierOf(p) === 'flex' && !five.includes(p.id));
+    if (flexOff.length && coreOn.length > 1) five = five.map(id => id === coreOn[1] ? flexOff[0].id : id);
+  }
+  five = five.filter((id, i) => id && five.indexOf(id) === i).slice(0, 5);
+  const same = five.length === nx.lineup.length && five.every(id => nx.lineup.includes(id));
+  return same || five.length < Math.min(5, avail.length) ? null : five;
+}
+function situationHTML(){
+  const sit = situation();
+  if (!sit) return '';
+  const P = S.plan, nx = P.segs[P.cur + 1];
+  const five = suggestion(sit);
+  const lead = sit.m > 0 ? 'Up ' + sit.m : sit.m < 0 ? 'Down ' + -sit.m : 'Tied';
+  const head = sit.kind === 'close' ? `Close game · ${lead} · ${fmt(sit.left)} left` : `${sit.m > 0 ? 'Big lead' : 'Out of reach'} · ${lead}`;
+  if (!five) return `<div class="situ ${sit.kind}"><span class="eyebrow">${head}</span><span>${sit.kind === 'close' ? 'The next five is already your strongest.' : 'The next five already has extra development time.'}</span></div>`;
+  const ins = sortIds(five.filter(id => !nx.lineup.includes(id))), outs = sortIds(nx.lineup.filter(id => !five.includes(id)));
+  return `<div class="situ ${sit.kind}"><span class="eyebrow">${head}</span>
+    <b>${sit.kind === 'close' ? 'Suggest your strongest five next' : 'Good stretch for development minutes'}</b>
+    <div class="five">${sortIds(five).map(id => { const p = byId(id); return `<span class="${p ? tierOf(p) : ''} ${ins.includes(id) ? 'new' : ''}">${esc(pname(id))}</span>`; }).join('')}</div>
+    <span class="cue">Instead of the plan: ${ins.map((id, k) => esc(pname(id, false)) + ' for ' + esc(pname(outs[k], false))).join(', ')}.</span>
+    <span class="cue">${sit.kind === 'close' ? 'Changes the next stretch only. Developing players who lose minutes get first call on extra time in later games.' : 'Changes the next stretch only. The rest of the game re-balances.'}</span>
+    <button class="btn small" data-act="useSuggestion">Use this five next</button></div>`;
 }
 function projection(){
   const s = {...S.settings};
@@ -773,6 +819,15 @@ function viewToday(){
     </div>
   </section>
 
+  <section class="block">
+    <h2>Game situations</h2>
+    <div class="card fields">
+      ${field('Suggest lineups from the score', 'suggest', [[true, 'Yes'], [false, 'No']], 'Type the score at each sub in live mode. Close late: it suggests your strongest five. Big lead (or out of reach): it suggests a second developing player and a rest for your busiest starter. You decide; nothing changes until you tap it.')}
+      ${s.suggest ? field('Close game means within', 'closeWithin', [[4, '4 pts'], [6, '6 pts'], [8, '8 pts']], 'Checked from the middle of the 3rd quarter on.') : ''}
+      ${s.suggest ? field('Big lead means up by', 'bigLead', [[10, '10 pts'], [15, '15 pts'], [20, '20 pts']], `After the 1st quarter. In the 4th, ${s.bigLead - 5}+ counts. Down ${s.bigLead + 5}+ in the 2nd half counts too.`) : ''}
+    </div>
+  </section>
+
   ${armBtn('build', 'Build today\'s rotation', 'Replace the rotation in progress?', 'build', building, 'btn primary big')}
   <p class="help">The 5th quarter goes to the developing players${flex.length && s.flexFifth !== 'off' ? ' plus some flex time' : ''}, shared so everyone's total minutes come out as even as possible. In the real game the floor always has ${s.devOnFloor === 1 ? '4 core players and 1 developing player' : '3 core players and 2 developing players'}, and minutes are spread as evenly as that allows.</p>`;
 }
@@ -817,7 +872,7 @@ function liveCard(){
   const P = S.plan, segs = P.segs, s = P.s;
   if (P.cur == null){
     return `<div class="card" style="display:flex;flex-direction:column;gap:10px">
-      <div><span class="eyebrow">Game time</span><p class="help" style="margin-top:4px">Step through the game one sub at a time. If a sub goes in late, tap the time it really happened and the rest of the game evens out. If a player gets hurt, tap her name.</p></div>
+      <div><span class="eyebrow">Game time</span><p class="help" style="margin-top:4px">Step through the game one sub at a time and type the score at each sub. In close games it suggests your strongest five; in lopsided games, extra development minutes. If a player gets hurt, tap her name.</p></div>
       <button class="btn primary big" data-act="liveStart">Start live mode</button></div>`;
   }
   if (P.cur >= segs.length){
@@ -835,8 +890,7 @@ function liveCard(){
     const {ins, outs} = changes(g, nx);
     const pe = plannedEnd(g);
     const when = nx.kind !== g.kind ? 'Tip-off · ' + Engine.segLabel(nx, s) + ' ' + fmt(nx.start) : mid ? Engine.segLabel(nx, s) + ' at ' + fmt(pe) : Engine.segLabel(nx, s) + ' starts';
-    const lead = aimLead();
-    const cue = mid && ins.length ? `<span class="cue">Send ${ins.map(id => esc(pname(id, false))).join(' + ')} to the table at ${fmt(Math.min(g.start, pe + lead + 0.5))} · sub at the first whistle after ${fmt(pe + lead)}</span>` : '';
+    const cue = mid && ins.length ? `<span class="cue">Send ${ins.map(id => esc(pname(id, false))).join(' + ')} to the table around ${fmt(Math.min(g.start, pe + 0.5))}</span>` : '';
     nextHTML = `<div class="next"><span class="eyebrow">Next sub · ${when}</span>
       ${nx.kind !== g.kind ? `<div class="io"><div><b class="in">START</b> ${sortIds(nx.lineup).map(id => esc(pname(id))).join(', ')}</div></div>` :
         (ins.length ? `<div class="io"><div><b class="in">IN</b> ${ins.map(id => esc(pname(id))).join(', ')}</div><div><b class="outx">OUT</b> ${outs.map(id => esc(pname(id))).join(', ')}</div></div>` : '<span>Same five stay on.</span>')}
@@ -847,17 +901,25 @@ function liveCard(){
         `<button data-act="liveNext" data-t="${t}">${fmt(t)}${t > pe ? ' <small>early</small>' : ''}</button>`).join('')}</div></div>`;
     }
   }
-  const scoreRow = g.kind === 'game' ? `<div class="score-in"><span class="eyebrow">Score now <small>(optional)</small></span>
-      <label>${esc(S.team || 'Us')}<input class="num" inputmode="numeric" pattern="[0-9]*" data-score="us" value="${esc(P.score ? P.score.us : '')}" aria-label="Our score"></label>
-      <label>Them<input class="num" inputmode="numeric" pattern="[0-9]*" data-score="them" value="${esc(P.score ? P.score.them : '')}" aria-label="Their score"></label></div>` : '';
+  let scoreRow = '';
+  if (g.kind === 'game'){
+    const sc = readScore(), m = sc ? sc.us - sc.them : null;
+    const stale = sc && !P.scoreTouched && P.cur > 0 && segs[P.cur - 1].kind === 'game';
+    scoreRow = `<div class="scorebox"><div class="sb-head"><span class="eyebrow">Score at this sub</span><span class="sb-m">${m == null ? 'Type the scoreboard' : m > 0 ? 'Up ' + m : m < 0 ? 'Down ' + -m : 'Tied'}</span></div>
+      <div class="sb-row"><label><span>${esc(S.team || 'Us')}</span><input class="num" inputmode="numeric" pattern="[0-9]*" data-score="us" value="${esc(P.score ? P.score.us : '')}" placeholder="0" aria-label="Our score"></label>
+      <span class="sb-dash">–</span>
+      <label><span>Them</span><input class="num" inputmode="numeric" pattern="[0-9]*" data-score="them" value="${esc(P.score ? P.score.them : '')}" placeholder="0" aria-label="Their score"></label></div>
+      ${stale ? '<span class="cue">Same as the last sub. Update it if anyone scored.</span>' : ''}</div>`;
+  }
   const goLabel = !nx ? 'End game ›' : mid && changes(g, nx).ins.length ? 'Subs in · ' + fmt(plannedEnd(g)) + ' ›' : 'Next ›';
   return `<div class="live" aria-live="polite">
     <div class="live-top"><span class="eyebrow">On the floor now</span><span class="eyebrow num">${P.cur + 1} of ${segs.length}</span></div>
     <div class="live-clock"><b>${Engine.segLabel(g, s)}</b><span class="num">${fmt(g.start)}–${fmt(nx && mid ? plannedEnd(g) : g.end)}</span></div>
     <div class="floor">${sortIds(g.lineup).map(id => { const p = byId(id); return `<button class="floor-p" data-act="pick" data-seg="${P.cur}" data-id="${id}">
       <span class="jn">${p && p.num ? esc(p.num) : '–'}</span><span class="fn">${esc(p ? p.name : 'Removed')}</span><span class="tag ${p ? p.tier : ''}">${p ? tierWord(p.tier) : ''}</span></button>`; }).join('')}</div>
-    ${nextHTML}
     ${scoreRow}
+    ${nextHTML}
+    <div id="situ">${situationHTML()}</div>
     <div class="live-nav"><button class="btn" data-act="livePrev" ${P.cur === 0 ? 'disabled' : ''}>Back</button><button class="btn go" data-act="liveNext">${goLabel}</button></div>
     ${chips}
     ${P.out.length ? `<div class="outlist"><span>Out:</span>${P.out.map(id => `<button data-act="returnIn" data-id="${id}">${esc(pname(id, false))} · put back</button>`).join('')}</div>` : ''}
@@ -895,6 +957,10 @@ function gridHTML(){
 
 function segCards(){
   const P = S.plan, s = P.s;
+  const res = {}; let gi = 0;
+  const margins = stintMargins(P.segs);
+  P.segs.forEach((g, i) => { if (g.kind === 'game') res[i] = margins[gi++]; });
+  const sign = v => v > 0 ? '+' + v : v < 0 ? '−' + -v : '0';
   return P.segs.map((g, i) => {
     const prev = P.segs[i - 1];
     let chg;
@@ -907,6 +973,8 @@ function segCards(){
     const state = P.cur == null ? '' : i === P.cur ? 'now' : i < P.cur ? 'past' : '';
     return `<article class="segcard ${state}">
       <header><span class="sl">${Engine.segLabel(g, s)}</span><span class="ck num">${fmt(g.start)}–${fmt(g.end)}</span>
+        ${res[i] && res[i].d != null ? `<span class="res ${res[i].d > 0 ? 'pos' : res[i].d < 0 ? 'neg' : ''} num">${sign(res[i].d)} <small>${g.sc.us}–${g.sc.them}</small></span>` : ''}
+        ${g.situ ? `<span class="tag ${g.situ === 'close' ? 'core' : 'dev'}">${g.situ === 'close' ? 'Close' : 'Dev time'}</span>` : ''}
         ${g.locked ? `<span class="ed">Edited <button class="btn link small" data-act="unlock" data-seg="${i}">Undo</button></span>` : ''}</header>
       <div class="chg">${chg}</div>
       <div class="chips">${sortIds(g.lineup).map(id => { const p = byId(id); return `<button class="chip ${p ? p.tier : ''}" data-act="pick" data-seg="${i}" data-id="${id}">${p && p.num ? `<small>#${esc(p.num)}</small>` : ''}${esc(p ? p.name : 'Removed')}</button>`; }).join('')}</div>
@@ -975,6 +1043,7 @@ function viewSeason(){
     <div class="grid-wrap"><table class="stable"><thead><tr><th>Player</th><th>GP</th><th>Avg game</th><th>Avg 5th</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table></div>
   </section>
   ${impactHTML()}
+  ${lineupsHTML()}
   <section class="block">
     <h2>Games</h2>
     <div class="games">${H.slice().reverse().map(g => `<div class="game"><div><b>${g.opp ? 'vs ' + esc(g.opp) : 'Game'}</b> <span class="num">${esc(g.date)}${g.final ? ' · ' + (g.final.us > g.final.them ? 'W ' : g.final.us < g.final.them ? 'L ' : 'T ') + g.final.us + '–' + g.final.them : ''}</span><br><span>${Object.keys(g.mins || {}).length} players</span></div>
@@ -998,7 +1067,7 @@ function impactHTML(){
   const q = S.settings.qLen || 7;
   const sgn = v => (v > 0.05 ? '+' : v < -0.05 ? '−' : '') + mins(Math.abs(v));
   const slip = avgSlip();
-  const timing = slip == null ? '' : `<p class="help">Mid-quarter subs have gone in ${slip >= 0 ? fmt(slip) + ' late' : fmt(-slip) + ' early'} on average. Live mode now cues them ${fmt(aimLead())} early to make up for it.</p>`;
+  const timing = slip == null ? '' : `<p class="help">Mid-quarter subs have gone in ${slip >= 0 ? fmt(slip) + ' late' : fmt(-slip) + ' early'} on average.</p>`;
   if (!scored) return `<section class="block"><h2>On-floor impact</h2>
     <div class="card"><p class="help">Type the score at each sub in live mode (it's optional) and this shows how the team does with each player on the floor. That tells you which developing player costs the least, and who to pair her with.</p></div>${timing}</section>`;
   const R = ranked().filter(p => st[p.id] && st[p.id].on > 0);
@@ -1011,6 +1080,33 @@ function impactHTML(){
     <div class="grid-wrap"><table class="stable"><thead><tr><th>Player</th><th>Min</th><th>+/−</th><th>Per qtr</th><th>vs off</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="help"><b>Per qtr</b> is the team's point margin per ${q}-minute quarter with her on the floor. <b>vs off</b> compares it with when she sits. Faded rows have under ${3 * q} minutes, so treat them as a hint, not a verdict. With only 5 kids on the floor, a small sample swings a lot.</p>
     ${timing}
+  </section>`;
+}
+
+// Every five-player group that has played with the score tracked, most minutes first.
+function lineupsHTML(){
+  const L = {};
+  const sit = {close:{min:0, d:0, n:0}, dev:{min:0, d:0, n:0}};
+  S.history.forEach(g => (g.stints || []).forEach(t => {
+    if (t.d == null) return;
+    const k = sortIds(t.l).join(',');
+    const r = L[k] = L[k] || {ids:sortIds(t.l), min:0, d:0, n:0};
+    r.min += t.len; r.d += t.d; r.n++;
+    if (t.s && sit[t.s]){ sit[t.s].min += t.len; sit[t.s].d += t.d; sit[t.s].n++; }
+  }));
+  const rows = Object.values(L).sort((a, b) => b.min - a.min).slice(0, 8);
+  if (!rows.length) return '';
+  const q = S.settings.qLen || 7;
+  const sgn = v => (v > 0.05 ? '+' : v < -0.05 ? '−' : '') + mins(Math.abs(v));
+  const devOf = r => r.ids.filter(id => { const p = byId(id); return p && tierOf(p) === 'dev'; });
+  const sitLine = (k, label) => sit[k].n ? `<li><b>${label}</b> ${sit[k].n} stretch${sit[k].n > 1 ? 'es' : ''}, ${mins(sit[k].min)} min, ${sgn(sit[k].d)} points</li>` : '';
+  const sl = sitLine('close', 'Strongest five in close games:') + sitLine('dev', 'Development fives with a big lead:');
+  return `<section class="block">
+    <div class="block-head"><h2>Lineups</h2><p class="sub">Most-used fives with the score tracked</p></div>
+    <div class="lus">${rows.map(r => `<div class="lu"><div class="lu-n">${r.ids.map(id => { const p = byId(id); return `<span class="${p ? tierOf(p) : ''}">${esc(p ? p.name : '?')}</span>`; }).join('')}</div>
+      <div class="lu-s num"><span>${mins(r.min)} min</span><b class="${r.d > 0 ? 'pos' : r.d < 0 ? 'neg' : ''}">${sgn(r.d)}</b><span>${r.min >= q ? sgn(r.d / r.min * q) + ' per qtr' : ''}</span></div></div>`).join('')}</div>
+    ${sl ? `<ul class="sitsum">${sl}</ul>` : ''}
+    <p class="help">Developing player in each five is in purple, flex in teal. A five needs a few games together before its number means much.</p>
   </section>`;
 }
 
@@ -1099,6 +1195,16 @@ async function keepAwake(on){
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.plan && S.plan.cur != null && S.tab === 'rotation') keepAwake(true); });
 
+// Refresh the live card after typing a score (margin + suggestion) without stealing focus from the box being typed in.
+function rerenderLive(){
+  if (!S.plan || S.plan.cur == null) return;
+  const sc = readScore(), m = sc ? sc.us - sc.them : null;
+  const el = document.querySelector('.sb-m');
+  if (el) el.textContent = m == null ? 'Type the scoreboard' : m > 0 ? 'Up ' + m : m < 0 ? 'Down ' + -m : 'Tied';
+  const st = document.querySelector('.scorebox .cue'); if (st) st.remove();
+  const box = document.getElementById('situ'); if (box) box.innerHTML = situationHTML();
+}
+
 /* ---------- actions ---------- */
 const A = {
   tab(d){ S.tab = d.tab; UI.sheet = null; window.scrollTo(0, 0); },
@@ -1110,6 +1216,14 @@ const A = {
   },
   arm(d){ UI.armed = d.key; return 'keepArm'; },
   build(){ buildPlan(); S.tab = 'rotation'; window.scrollTo(0, 0); toast('Rotation built'); },
+  useSuggestion(){
+    const P = S.plan, sit = situation(); if (!sit) return;
+    const five = suggestion(sit); if (!five) return;
+    const nx = P.segs[P.cur + 1];
+    nx.lineup = five; nx.locked = true; nx.situ = sit.kind;
+    replan();
+    toast(sit.kind === 'close' ? 'Strongest five set for the next stretch' : 'Development five set for the next stretch');
+  },
   liveStart(){ S.plan.cur = 0; S.plan.live = true; S.plan.score = S.plan.score || {us:'', them:''}; keepAwake(true); window.scrollTo(0, 0); },
   liveNext(d){
     const P = S.plan, i = P.cur, g = P.segs[i], nx = P.segs[i + 1];
@@ -1120,8 +1234,7 @@ const A = {
       g.slip = Math.round((plannedEnd(g) - g.end) * 100) / 100;
       g.logged = true;
     }
-    // Only trust a score the coach actually typed during this stretch; a stale number would read as a 0–0 run.
-    if (g.kind === 'game' && P.scoreTouched){ const sc = readScore(); if (sc) g.sc = sc; }
+    if (g.kind === 'game'){ const sc = readScore(); if (sc) g.sc = sc; }
     P.scoreTouched = false;
     P.cur = Math.min(P.segs.length, i + 1);
     if (moved && P.cur < P.segs.length){
@@ -1221,7 +1334,7 @@ document.addEventListener('input', e => {
     const p = byId(t.dataset.id); if (p){ p[t.dataset.pf] = t.value; S.sample = false; save(); }
   } else if (t.dataset.team !== undefined){ S.team = t.value; $('#teamName').textContent = t.value || 'Team'; save(); }
   else if (t.dataset.planField && S.plan){ S.plan[t.dataset.planField] = t.value; save(); }
-  else if (t.dataset.score && S.plan){ S.plan.score = S.plan.score || {us:'', them:''}; S.plan.score[t.dataset.score] = t.value.replace(/\D/g, ''); S.plan.scoreTouched = true; save(); }
+  else if (t.dataset.score && S.plan){ S.plan.score = S.plan.score || {us:'', them:''}; S.plan.score[t.dataset.score] = t.value.replace(/\D/g, ''); S.plan.scoreTouched = true; save(); clearTimeout(UI.scoreT); UI.scoreT = setTimeout(rerenderLive, 250); }
 });
 document.addEventListener('change', e => {
   const t = e.target;
