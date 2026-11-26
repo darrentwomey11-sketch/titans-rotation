@@ -23,6 +23,7 @@
   --head:#0b3a8c; --head-ink:#ffffff; --head-muted:#b4cdee; --sky:#7cc0ee; --navy:#06275e;
   --core:#e2651d; --core-soft:#fde4d3; --core-ink:#9a3f0b;
   --dev:#6a49d3; --dev-soft:#ebe5fb; --dev-ink:#4b2fa8;
+  --flex:#0f8f8a; --flex-soft:#d5f2ef; --flex-ink:#0a6460;
   --cell-off:#e6eaf1; --cur-col:#fff4c9;
   --ok:#1b7a45; --ok-soft:#dcf2e5; --warn:#9a5d0a; --warn-soft:#fbefd9; --bad:#b83131; --bad-soft:#f9e0e0;
   --font-display:'Barlow Condensed','Arial Narrow','Roboto Condensed',system-ui,sans-serif;
@@ -36,6 +37,7 @@
     --head:#082d6e; --head-ink:#ffffff; --head-muted:#9dbbe2; --sky:#7cc0ee; --navy:#041c45;
     --core:#f07c38; --core-soft:#3a2418; --core-ink:#ffb487;
     --dev:#9a80f0; --dev-soft:#271f45; --dev-ink:#c8b9ff;
+  --flex:#3fc7bd; --flex-soft:#12302e; --flex-ink:#8fe6df;
     --cell-off:#1f2a3c; --cur-col:#3a3416;
     --ok:#5fd394; --ok-soft:#14301f; --warn:#f0b65a; --warn-soft:#33270f; --bad:#ff7b7b; --bad-soft:#3a1717;
     color-scheme:dark;
@@ -47,6 +49,7 @@
   --head:#082d6e; --head-ink:#ffffff; --head-muted:#9dbbe2; --sky:#7cc0ee; --navy:#041c45;
   --core:#f07c38; --core-soft:#3a2418; --core-ink:#ffb487;
   --dev:#9a80f0; --dev-soft:#271f45; --dev-ink:#c8b9ff;
+  --flex:#3fc7bd; --flex-soft:#12302e; --flex-ink:#8fe6df;
   --cell-off:#1f2a3c; --cur-col:#3a3416;
   --ok:#5fd394; --ok-soft:#14301f; --warn:#f0b65a; --warn-soft:#33270f; --bad:#ff7b7b; --bad-soft:#3a1717;
   color-scheme:dark;
@@ -101,6 +104,9 @@ h3{margin:0}
 .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap}
 .tag.core{background:var(--core-soft);color:var(--core-ink)}
 .tag.dev{background:var(--dev-soft);color:var(--dev-ink)}
+.tag.flex,.chip.flex{background:var(--flex-soft);color:var(--flex-ink)}
+.rgrid .cell.on.flex i{background:var(--flex)}
+.proj .flex-c .big{color:var(--flex)}
 .tag.out{background:var(--bad-soft);color:var(--bad)}
 
 /* who's here */
@@ -123,7 +129,7 @@ h3{margin:0}
 .segc{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
 .segc button{flex:1 1 0;min-width:0;min-height:40px;border:none;background:none;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .segc button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12),0 0 0 1px var(--line)}
-.proj{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.proj{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px}
 .proj > div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .proj .big{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.1}
 .proj .big small{font-size:15px;color:var(--muted);font-weight:600}
@@ -342,8 +348,10 @@ const Engine = (() => {
     const season = opts.season || {};
     const isLocked = (g, i) => i < lockedUntil || g.locked;
     const byRank = (a, b) => a.rank - b.rank;
-    const core = players.filter(p => p.tier === 'core').sort(byRank);
-    const dev = players.filter(p => p.tier !== 'core').sort(byRank);
+    // Core and flex players share the "good" spots; flex players come after every core player.
+    const isFlex = p => p.tier === 'flex';
+    const core = players.filter(p => p.tier === 'core' || isFlex(p)).sort((a, b) => (isFlex(a) - isFlex(b)) || byRank(a, b));
+    const dev = players.filter(p => p.tier !== 'core' && !isFlex(p)).sort(byRank);
     segs.forEach((g, i) => { if (!isLocked(g, i)) g.lineup = []; });
 
     let d = Math.min(s.devOnFloor, dev.length);
@@ -359,7 +367,8 @@ const Engine = (() => {
     const freeMin = free.reduce((a, i) => a + segs[i].len, 0);
 
     const target = {}, w = {};
-    core.forEach((p, r) => w[p.id] = coreWeight(s.coreMode, r, core.length));
+    // Flex players get a smaller share than core: more than developing, less than the starters.
+    core.forEach((p, r) => w[p.id] = coreWeight(s.coreMode, r, core.length) * (isFlex(p) ? 0.6 : 1));
     dev.forEach(p => w[p.id] = 1);
     // When there is someone to rotate in, every core player gets at least one rest stretch.
     const restLen = gameIdx.length ? Math.max(...gameIdx.map(i => segs[i].len)) : 0;
@@ -409,7 +418,8 @@ const Engine = (() => {
     for (const i of fifthIdx){
       if (isLocked(segs[i], i)) continue;
       const order = players.slice().sort((a, b) => {
-        const ca = a.tier === 'core' ? 1 : 0, cb = b.tier === 'core' ? 1 : 0;
+        const lvl = p => p.tier === 'core' ? 2 : p.tier === 'flex' ? 1 : 0;
+        const ca = lvl(a), cb = lvl(b);
         if (ca !== cb) return ca - cb;
         if (fGot[a.id] !== fGot[b.id]) return fGot[a.id] - fGot[b.id];
         if (Math.abs(got[a.id] - got[b.id]) > 0.01) return got[a.id] - got[b.id];
@@ -450,7 +460,7 @@ const TEAM_ROSTER = [
   ['Gwen',    'core', 'Tallest, best rebounder'],
   ['Morgan',  'core', 'Lockdown defender, solid handles'],
   ['Audrey',  'core', 'Size, rebounding, dribbling'],
-  ['Stella',  'core', 'Sixth man, can handle the ball'],
+  ['Stella',  'flex', 'Sixth man, can handle the ball'],
   ['Ava',     'dev',  'Can dribble, similar to Stella'],
   ['Maleia',  'dev',  'Great teammate, coachable'],
   ['Jordan',  'dev',  'Size; working on fundamentals'],
@@ -470,6 +480,8 @@ let S = load();
 if (!S || !Array.isArray(S.roster) || !S.roster.length) S = fresh();
 // Phones that opened the earlier version still hold the "Player 1–11" placeholders: swap in the team.
 if (S.sample){ S.roster = sampleRoster(); S.sample = false; S.here = {}; S.plan = null; S.settings.qLen = 7; }
+// Stella moved from core to the new flex level.
+if (!S.flexV){ const st = S.roster.find(p => p.id === 'pstella'); if (st && st.tier === 'core') st.tier = 'flex'; S.flexV = 1; }
 S.settings = {...DEFAULT_SETTINGS, ...(S.settings || {})};
 S.here = S.here || {};
 S.history = S.history || [];
@@ -485,7 +497,9 @@ const rankOf = id => { const i = S.roster.findIndex(p => p.id === id); return i 
 const sortIds = ids => ids.slice().sort((a, b) => rankOf(a) - rankOf(b));
 const isHere = id => S.here[id] !== false;
 const fmt = Engine.fmt;
-const tierWord = t => t === 'core' ? 'Core' : 'Dev';
+const tierWord = t => t === 'core' ? 'Core' : t === 'flex' ? 'Flex' : 'Dev';
+const TIERS = [['core', 'Core'], ['flex', 'Flex'], ['dev', 'Developing']];
+const tierOf = p => p.tier === 'core' || p.tier === 'flex' ? p.tier : 'dev';
 function pname(id, withNum = true){
   const p = byId(id);
   if (!p) return 'Removed player';
@@ -539,10 +553,11 @@ function projection(){
   const players = ranked().filter(p => isHere(p.id));
   Engine.allocate(segs, players, s, {season:seasonAvg()});
   const m = Engine.minutes(segs);
-  const grp = t => players.filter(p => (p.tier === 'core') === (t === 'core')).map(p => m[p.id] || {g:0, f:0});
+  const grp = t => players.filter(p => tierOf(p) === t).map(p => m[p.id] || {g:0, f:0});
   const range = arr => arr.length ? [Math.min(...arr), Math.max(...arr)] : null;
-  const c = grp('core'), d = grp('dev');
-  return {core:range(c.map(x => x.g)), coreF:range(c.map(x => x.f)), dev:range(d.map(x => x.g)), devF:range(d.map(x => x.f)), nc:c.length, nd:d.length};
+  const out = {};
+  TIERS.forEach(([t]) => { const g = grp(t); out[t] = {n:g.length, g:range(g.map(x => x.g)), f:range(g.map(x => x.f))}; });
+  return out;
 }
 
 /* ---------- views ---------- */
@@ -556,8 +571,9 @@ function field(label, key, options, help){
 
 function viewToday(){
   const R = ranked(), s = S.settings;
-  const core = R.filter(p => p.tier === 'core'), dev = R.filter(p => p.tier !== 'core');
-  const hc = core.filter(p => isHere(p.id)).length, hd = dev.filter(p => isHere(p.id)).length;
+  const core = R.filter(p => tierOf(p) === 'core'), flex = R.filter(p => tierOf(p) === 'flex'), dev = R.filter(p => tierOf(p) === 'dev');
+  const hk = core.filter(p => isHere(p.id)).length, hf = flex.filter(p => isHere(p.id)).length;
+  const hc = hk + hf, hd = dev.filter(p => isHere(p.id)).length;
   const row = p => `<button class="prow ${isHere(p.id) ? '' : 'is-out'}" data-act="toggleHere" data-id="${p.id}" aria-pressed="${isHere(p.id)}">
       <span class="rk">${p.rank + 1}</span><span class="nm">${nameHTML(p.id)}${p.note ? `<em>${esc(p.note)}</em>` : ''}</span>
       <span class="tag ${p.tier}">${tierWord(p.tier)}</span><span class="st">${isHere(p.id) ? 'Here' : 'Out'}</span></button>`;
@@ -570,21 +586,21 @@ function viewToday(){
   return `
   ${!isStandalone() && !S.installDismissed ? installCard() : ''}
   <section class="block">
-    <div class="block-head"><h2>Who's here today?</h2><p class="sub num">${hc + hd} here · ${hc} core · ${hd} developing</p></div>
+    <div class="block-head"><h2>Who's here today?</h2><p class="sub num">${hc + hd} here · ${hk} core${flex.length ? ' · ' + hf + ' flex' : ''} · ${hd} developing</p></div>
     ${S.sample ? `<div class="note"><span><b>Sample roster.</b> Put in your real players on the Roster tab.</span><button class="btn small" data-act="tab" data-tab="roster">Edit roster</button></div>` : ''}
     <p class="help">Tap a player to mark them out (hurt, sick, missing).</p>
-    ${hc > 0 && hc <= 5 - s.devOnFloor ? `<div class="note"><span><b>Only ${hc} core here.</b> They'll play the whole game${hc < 5 - s.devOnFloor ? ' and developing players fill the open spots' : ''}.${s.devOnFloor === 1 && hd >= 2 ? ' Switching to 3 core + 2 dev gives them a breather.' : ''}</span></div>` : ''}
+    ${hc > 0 && hc <= 5 - s.devOnFloor ? `<div class="note"><span><b>Only ${hc} core${hf ? ' and flex' : ''} here.</b> They'll play the whole game${hc < 5 - s.devOnFloor ? ' and developing players fill the open spots' : ''}.${s.devOnFloor === 1 && hd >= 2 ? ' Switching to 3 core + 2 dev gives them a breather.' : ''}</span></div>` : ''}
     <div class="plist">
-      <div class="grp"><span>Core</span><span class="num">${hc}/${core.length}</span></div>${core.map(row).join('')}
+      <div class="grp"><span>Core</span><span class="num">${hk}/${core.length}</span></div>${core.map(row).join('')}
+      ${flex.length ? `<div class="grp"><span>Flex · subs in for core</span><span class="num">${hf}/${flex.length}</span></div>${flex.map(row).join('')}` : ''}
       <div class="grp"><span>Developing</span><span class="num">${hd}/${dev.length}</span></div>${dev.map(row).join('')}
     </div>
   </section>
 
   <section class="block">
     <h2>Expected minutes</h2>
-    <div class="proj">
-      <div class="core-c"><span class="eyebrow">Core · ${pr.nc} players</span><span class="big num">${rng(pr.core)} <small>min</small></span><span class="help">${pr.coreF && pr.coreF[1] > 0 ? 'Some also play the 5th Q' : 'in the real game'}</span></div>
-      <div class="dev-c"><span class="eyebrow">Developing · ${pr.nd} players</span><span class="big num">${rng(pr.dev)} <small>min</small></span><span class="help">${s.fifth && pr.devF ? '+ ' + rng(pr.devF) + ' min in the 5th Q' : 'in the real game'}</span></div>
+    <div class="proj">${TIERS.filter(([t]) => pr[t].n).map(([t, label]) => { const x = pr[t];
+      return `<div class="${t}-c"><span class="eyebrow">${label} · ${x.n}</span><span class="big num">${rng(x.g)} <small>min</small></span><span class="help">${s.fifth && x.f && x.f[1] > 0 ? '+ ' + rng(x.f) + ' in the 5th Q' : 'in the real game'}</span></div>`; }).join('')}
     </div>
   </section>
 
@@ -698,16 +714,14 @@ function gridHTML(){
       ${s.fifth ? `<td class="mcol f num">${mins(mm.f)}</td>` : ''}<td class="mcol num">${mins(mm.g)}</td></tr>`;
   };
   const span = segs.length + 1 + (s.fifth ? 2 : 1);
-  const core = R.filter(p => p.tier === 'core'), dev = R.filter(p => p.tier !== 'core');
+  const groupRows = TIERS.map(([t, label]) => { const g = R.filter(p => tierOf(p) === t);
+    return g.length ? `<tr class="sep"><td class="pcol">${label}</td><td colspan="${span - 1}"></td></tr>` + g.map(row).join('') : ''; }).join('');
   return `<div class="grid-wrap"><table class="rgrid">
     <thead><tr><th class="pcol" rowspan="2">Player</th>${groups.map(g => `<th colspan="${g.n}" class="${g.i > 0 ? 'gsep' : ''}">${g.lab}</th>`).join('')}
       ${s.fifth ? '<th class="mcol" rowspan="2">5th</th>' : ''}<th class="mcol" rowspan="2">Game</th></tr>
     <tr>${segs.map((g, i) => `<th class="num ${firstOf.has(i) && i > 0 ? 'gsep' : ''} ${i === P.cur ? 'cur' : ''}">${fmt(g.start)}</th>`).join('')}</tr></thead>
-    <tbody>
-      ${core.length ? `<tr class="sep"><td class="pcol">Core</td><td colspan="${span - 1}"></td></tr>` + core.map(row).join('') : ''}
-      ${dev.length ? `<tr class="sep"><td class="pcol">Developing</td><td colspan="${span - 1}"></td></tr>` + dev.map(row).join('') : ''}
-    </tbody></table></div>
-    <div class="legend"><span><i style="background:var(--core)"></i>Core on floor</span><span><i style="background:var(--dev)"></i>Developing on floor</span><span><i style="background:var(--cell-off)"></i>Bench</span>${P.cur != null ? '<span><i style="background:var(--cur-col);outline:1px solid var(--line)"></i>Now</span>' : ''}</div>`;
+    <tbody>${groupRows}</tbody></table></div>
+    <div class="legend"><span><i style="background:var(--core)"></i>Core on floor</span>${R.some(p => tierOf(p) === 'flex') ? '<span><i style="background:var(--flex)"></i>Flex on floor</span>' : ''}<span><i style="background:var(--dev)"></i>Developing on floor</span><span><i style="background:var(--cell-off)"></i>Bench</span>${P.cur != null ? '<span><i style="background:var(--cur-col);outline:1px solid var(--line)"></i>Now</span>' : ''}</div>`;
 }
 
 function segCards(){
@@ -768,12 +782,13 @@ function viewRoster(){
       <div class="rk-ctl"><button class="ib" data-act="move" data-id="${p.id}" data-dir="-1" aria-label="Move ${esc(p.name)} up" ${i === 0 ? 'disabled' : ''}>${up}</button><span>${i + 1}</span><button class="ib" data-act="move" data-id="${p.id}" data-dir="1" aria-label="Move ${esc(p.name)} down" ${i === R.length - 1 ? 'disabled' : ''}>${dn}</button></div>
       <input class="in-txt num" id="num-${p.id}" data-pf="num" data-id="${p.id}" value="${esc(p.num)}" placeholder="#" inputmode="numeric" maxlength="3" aria-label="Jersey number">
       <input class="in-txt" id="name-${p.id}" data-pf="name" data-id="${p.id}" value="${esc(p.name)}" aria-label="Player name" autocomplete="off">
-      <select class="in-sel" id="tier-${p.id}" data-pf="tier" data-id="${p.id}" aria-label="Level"><option value="core" ${p.tier === 'core' ? 'selected' : ''}>Core</option><option value="dev" ${p.tier !== 'core' ? 'selected' : ''}>Developing</option></select>
+      <select class="in-sel" id="tier-${p.id}" data-pf="tier" data-id="${p.id}" aria-label="Level">${TIERS.map(([t, label]) => `<option value="${t}" ${tierOf(p) === t ? 'selected' : ''}>${label}</option>`).join('')}</select>
       ${UI.armed === 'del-' + p.id ? `<button class="del armed" data-act="delPlayer" data-id="${p.id}">Remove</button>` : `<button class="del" data-act="arm" data-key="del-${p.id}" aria-label="Remove ${esc(p.name)}">×</button>`}
       <input class="in-txt note-in" id="note-${p.id}" data-pf="note" data-id="${p.id}" value="${esc(p.note || '')}" placeholder="Strengths / role (e.g. best rebounder)" aria-label="Notes for ${esc(p.name)}" autocomplete="off">
     </div>`).join('')}</div>
     <div class="row-actions"><button class="btn" data-act="goBackup">Load roster code</button><button class="btn" data-act="addPlayer">Add player</button>${armBtn('reset', 'Reset to team roster', 'Erase changes and season?', 'resetAll', true, 'btn')}</div>
     ${isStandalone() ? '' : '<button class="btn" data-act="install">Add to Home Screen</button>'}
+    <p class="help"><b>Flex</b> players sub in for core players when they rest: fewer minutes than core, more than developing, and first to fill any open 5th-quarter spot.</p>
     <p class="help"><b>Core</b> players make up most of the floor in the real game. <b>Developing</b> players get the 5th quarter plus a share of the one developing spot on the floor. Everything is saved on this phone.</p>
   </section>`;
 }
