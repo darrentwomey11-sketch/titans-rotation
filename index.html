@@ -129,8 +129,11 @@ h3{margin:0}
 .segc{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
 .segc button{flex:1 1 0;min-width:0;min-height:40px;border:none;background:none;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .segc button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12),0 0 0 1px var(--line)}
-.proj{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px}
-.proj > div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.proj{display:flex;flex-direction:column;gap:6px}
+.proj > div{background:var(--surface-2);border-radius:10px;padding:10px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"lab big" "help big";align-items:center;column-gap:12px;min-width:0}
+.proj .eyebrow{grid-area:lab}
+.proj .help{grid-area:help}
+.proj .big{grid-area:big;white-space:nowrap}
 .proj .big{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1.1}
 .proj .big small{font-size:15px;color:var(--muted);font-weight:600}
 .proj .core-c .big{color:var(--core)}
