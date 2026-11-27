@@ -1,5 +1,5 @@
 // Offline support: keeps the app working in gyms with no signal.
-const CACHE = 'titans-20261126191433';
+const CACHE = 'titans-20261126191850';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

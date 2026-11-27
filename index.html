@@ -498,6 +498,16 @@ const Engine = (() => {
           lus[i] = ids; prev = new Set(ids);
         });
         const tot = id => got[id] + fGot[id];
+        // Higher-ranked flex players never finish below lower-ranked ones: trade 5th-quarter stretches if needed.
+        const fl = flexP.slice().sort((a, b) => a.rank - b.rank);
+        for (let x = 0; x < fl.length; x++) for (let y = x + 1; y < fl.length; y++){
+          const hi = fl[x].id, lo = fl[y].id;
+          for (const i of free5){
+            if (tot(lo) <= tot(hi) + 0.01) break;
+            const L = lus[i];
+            if (L && L.includes(lo) && !L.includes(hi)){ lus[i] = L.map(z => z === lo ? hi : z); fGot[lo] -= segs[i].len; fGot[hi] += segs[i].len; }
+          }
+        }
         const devMax = Math.max(0, ...dev.map(p => tot(p.id)));
         return {lus, ok: flexP.every(p => tot(p.id) >= devMax - 0.01)};
       };
@@ -540,7 +550,7 @@ const TEAM_ROSTER = [
   ['Morgan',  'core', 'Lockdown defender, solid handles'],
   ['Audrey',  'core', 'Size, rebounding, dribbling'],
   ['Stella',  'flex', 'Sixth man, can handle the ball'],
-  ['Ava',     'dev',  'Can dribble, similar to Stella'],
+  ['Ava',     'flex', 'Can dribble, similar to Stella'],
   ['Maleia',  'dev',  'Great teammate, coachable'],
   ['Jordan',  'dev',  'Size; working on fundamentals'],
   ['Scarlet', 'dev',  'Height; building athleticism'],
@@ -562,6 +572,8 @@ if (S.sample){ S.roster = sampleRoster(); S.sample = false; S.here = {}; S.plan 
 // Stella moved from core to the new flex level.
 if (!S.flexV){ const st = S.roster.find(p => p.id === 'pstella'); if (st && st.tier === 'core') st.tier = 'flex'; S.flexV = 1; }
 // v2: 2-minute subs in the 5th quarter so Stella can play part of it.
+// Ava moved up from developing to flex (Stella stays ranked ahead of her).
+if (!S.avaFlexV){ const av = S.roster.find(p => p.id === 'pava'); if (av && av.tier === 'dev') av.tier = 'flex'; S.avaFlexV = 1; }
 if (!S.v2){ if (S.settings) { S.settings.fifthSubs = 4; S.settings.flexFifth = 'auto'; } S.v2 = 1; }
 S.settings = {...DEFAULT_SETTINGS, ...(S.settings || {})};
 S.here = S.here || {};
