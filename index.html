@@ -431,6 +431,15 @@ const Engine = (() => {
     const restLen = gameIdx.length ? Math.max(...gameIdx.map(i => segs[i].len)) : 0;
     const coreCap = core.length > c ? Math.max(0, totalGame - restLen) : totalGame;
     waterfill(core, c * freeMin + core.reduce((a, p) => a + got[p.id], 0), w, coreCap, target);
+    // With every core player here, a flex player (Ava) only plays next to core and near-core players: she takes the
+    // developing player's spot for her stretches instead of sitting beside one. Her minutes stay the same; core and
+    // near-core share all the other spots, and developing players share what's left of theirs.
+    const isCore = p => p.tier === 'core';
+    const flexSep = s.devOnFloor === 1 && d === 1 && core.filter(isCore).length >= 5 && core.some(isFlex);
+    const flexers = flexSep ? core.filter(isFlex) : [];
+    const goodSlots = core.filter(p => !flexers.includes(p));
+    if (flexSep) waterfill(goodSlots, c * freeMin + goodSlots.reduce((a, p) => a + got[p.id], 0), w, coreCap, target);
+    const flexNeed = flexers.reduce((a, p) => a + Math.max(0, target[p.id] - got[p.id]), 0);
     // Developing players are evened out on total minutes, so once the whole 5th quarter has been played it counts too.
     // While it's still being planned (or partly edited), the 5th quarter does the evening out itself.
     const base = {};
@@ -438,11 +447,11 @@ const Engine = (() => {
     const fifthDone = segs.every((g, i) => g.kind !== 'fifth' || i < lockedUntil);
     if (fifthDone) segs.forEach((g, i) => { if (g.kind === 'fifth') g.lineup.forEach(id => { if (dev.some(p => p.id === id)) base[id] += g.len; }); });
     const maxBase = Math.max(0, ...Object.values(base));
-    waterfill(dev, d * freeMin + dev.reduce((a, p) => a + got[p.id] + base[p.id], 0), w, totalGame + maxBase, target);
+    waterfill(dev, d * freeMin - flexNeed + dev.reduce((a, p) => a + got[p.id] + base[p.id], 0), w, totalGame + maxBase, target);
 
     // Best core players open and close the game when asked to.
     const fixed = {};
-    const topCore = core.slice(0, c).map(p => p.id);
+    const topCore = goodSlots.slice(0, c).map(p => p.id);
     if (gameIdx.length){
       const first = gameIdx[0], last = gameIdx[gameIdx.length - 1];
       if (s.startStrong && free.includes(first)) fixed[first] = topCore;
@@ -452,7 +461,6 @@ const Engine = (() => {
 
     // Never fewer than 3 core players on the floor in the real game (all of them if fewer are here):
     // a near-core or flex player only fills the 4th spot when a developing player is on.
-    const isCore = p => p.tier === 'core';
     const minCore = Math.min(3, c, core.filter(isCore).length);
     const pick = (group, k, i, isDev) => {
       const prev = i > 0 && segs[i-1].kind === 'game' ? new Set(segs[i-1].lineup) : new Set();
@@ -493,14 +501,17 @@ const Engine = (() => {
       return sel.map(p => p.id);
     };
 
-    for (const i of free){
+    // The flex player's turns in the developing spot are spread evenly through the game.
+    const fk = flexers.length && free.length ? Math.round(flexNeed / (freeMin / free.length)) : 0;
+    const flexTurn = j => fk > 0 && Math.floor((j + 1) * fk / free.length + 0.5) > Math.floor(j * fk / free.length + 0.5);
+    free.forEach((i, j) => {
       const g = segs[i];
       let cIds = fixed[i];
-      if (!cIds){ cIds = pick(core, c, i, false); cIds.forEach(id => got[id] += g.len); }
-      const dIds = pick(dev, d, i, true);
+      if (!cIds){ cIds = pick(goodSlots, c, i, false); cIds.forEach(id => got[id] += g.len); }
+      const dIds = flexTurn(j) ? pick(flexers, 1, i, true) : pick(dev, d, i, true);
       dIds.forEach(id => got[id] += g.len);
       g.lineup = [...cIds, ...dIds];
-    }
+    });
 
     // 5th quarter: developing players play all of it (shared only if there are more than 5).
     // Open spots go to flex players next (they're still developing, lowest-ranked first), and only then
@@ -657,14 +668,23 @@ function replan(){
   const players = ranked().filter(p => P.present.includes(p.id) && !P.out.includes(p.id));
   Engine.allocate(P.segs, players, P.s, {lockedUntil, season:seasonAvg()});
 }
-// A real-game stretch with fewer than 3 core on the floor while more are available (only happens from a hand edit).
-function thinCore(g){
+const tierId = id => { const p = byId(id); return p ? tierOf(p) : ''; };
+// Every core player is here (and playing 1 developing player): then flex players never share the floor with a developing player.
+function flexApart(){
   const P = S.plan;
-  if (!g || g.kind !== 'game') return 0;
-  const isC = id => { const p = byId(id); return !!p && tierOf(p) === 'core'; };
-  const avail = P.present.filter(id => !P.out.includes(id) && isC(id)).length;
-  const n = g.lineup.filter(isC).length;
-  return n < Math.min(3, avail) ? n : 0;
+  return P.s.devOnFloor === 1 && P.present.filter(id => !P.out.includes(id) && tierId(id) === 'core').length >= 5;
+}
+// What's wrong with a real-game stretch, if anything (only happens from a hand edit): fewer than 3 core while more
+// are available, or a flex player beside a developing player while every core player is here.
+function lineupWarn(g){
+  const P = S.plan;
+  if (!g || g.kind !== 'game') return null;
+  const avail = P.present.filter(id => !P.out.includes(id) && tierId(id) === 'core').length;
+  const n = g.lineup.filter(id => tierId(id) === 'core').length;
+  if (n < Math.min(3, avail)) return {tag:n + ' core', msg:'only ' + n + ' core on the floor'};
+  const f = g.lineup.find(id => tierId(id) === 'flex');
+  if (f && flexApart() && g.lineup.some(id => tierId(id) === 'dev')) return {tag:pname(f, false) + ' + dev', msg:pname(f, false) + ' is on with a developing player'};
+  return null;
 }
 function changes(a, b){
   return {ins: sortIds(b.lineup.filter(x => !a.lineup.includes(x))), outs: sortIds(a.lineup.filter(x => !b.lineup.includes(x)))};
@@ -704,7 +724,12 @@ function bestReplacement(cur, outId){
     const c = ideal.find(isCoreId) || fewest(bench.filter(isCoreId))[0];
     if (c) return c;
   }
-  return ideal.find(id => good(id) === want) || fewest(bench.filter(id => good(id) === want))[0] || ideal[0] || fewest(bench)[0] || null;
+  // With every core player here, a flex player and a developing player don't go on together.
+  const rest = g.lineup.filter(id => id !== outId);
+  const fits = id => !flexApart() || !((tierId(id) === 'flex' && rest.some(x => tierId(x) === 'dev')) || (tierId(id) === 'dev' && rest.some(x => tierId(x) === 'flex')));
+  const fi = ideal.filter(fits), fb = bench.filter(fits);
+  return fi.find(id => good(id) === want) || fewest(fb.filter(id => good(id) === want))[0] || fi[0] || fewest(fb)[0]
+    || ideal.find(id => good(id) === want) || fewest(bench.filter(id => good(id) === want))[0] || ideal[0] || fewest(bench)[0] || null;
 }
 // Points for minus points against in each real-game stretch, from the scores typed at each sub (null when unknown).
 function stintMargins(segs){
@@ -758,7 +783,7 @@ function suggestion(sit){
     const bestDev = devs.slice().sort((a, b) => ((impactOf(b.id) ?? -99) - (impactOf(a.id) ?? -99)) || a.rank - b.rank);
     five = [...good.slice(0, 5).map(p => p.id), ...bestDev.slice(0, Math.max(0, 5 - good.length)).map(p => p.id)];
   } else {
-    // A second developing player comes in for a near-core or flex player if one is on, otherwise for the busiest core player.
+    // Up to two developing players come in: for a flex or near-core player if one is on, otherwise for the busiest core player.
     const played = {};
     P.segs.slice(0, P.cur + 1).forEach(x => { if (x.kind === 'game') x.lineup.forEach(id => played[id] = (played[id] || 0) + x.len); });
     const season = seasonAvg();
@@ -768,11 +793,14 @@ function suggestion(sit){
       .sort((a, b) => (g.lineup.includes(a.id) - g.lineup.includes(b.id)) || ((played[a.id] || 0) - (played[b.id] || 0)) || ((season[a.id] || 0) - (season[b.id] || 0)) || b.rank - a.rank);
     // Even in a blowout 3 core stay on (all of them if fewer are here): the other two spots go to developing players.
     const keep = Math.min(3, avail.filter(p => tierOf(p) === 'core').length);
-    const devCount = five.filter(id => { const p = byId(id); return p && !isGood(p); }).length;
-    const midOn = five.filter(id => { const p = byId(id); return p && (tierOf(p) === 'near' || tierOf(p) === 'flex'); }).sort((a, b) => LVL[tierOf(byId(a))] - LVL[tierOf(byId(b))] || rankOf(a) - rankOf(b));
-    if (devCount < 2 && freshDev.length){
-      const outId = midOn[0] || (coreOn.length > keep ? coreOn[0] : null);
-      if (outId) five = five.map(id => id === outId ? freshDev[0].id : id);
+    // Flex players come off first, so none is left beside a developing player.
+    let devCount = five.filter(id => { const p = byId(id); return p && !isGood(p); }).length, k = 0;
+    const midOn = five.filter(id => tierId(id) === 'near' || tierId(id) === 'flex').sort((a, b) => LVL[tierId(b)] - LVL[tierId(a)] || rankOf(a) - rankOf(b));
+    const coreQ = coreOn.slice();
+    while (devCount < 2 && k < freshDev.length){
+      const outId = midOn.shift() || (coreQ.length > keep ? coreQ.shift() : null);
+      if (!outId) break;
+      five = five.map(id => id === outId ? freshDev[k].id : id); k++; devCount++;
     }
   }
   five = five.filter((id, i) => id && five.indexOf(id) === i).slice(0, 5);
@@ -843,7 +871,7 @@ function viewToday(){
     <div class="plist">
       <div class="grp"><span>Core</span><span class="num">${hk}/${core.length}</span></div>${core.map(row).join('')}
       ${near.length ? `<div class="grp"><span>Near core · first off the bench</span><span class="num">${hn}/${near.length}</span></div>${near.map(row).join('')}` : ''}
-      ${flex.length ? `<div class="grp"><span>Flex · subs in, plays the 5th Q</span><span class="num">${hf - hn}/${flex.length}</span></div>${flex.map(row).join('')}` : ''}
+      ${flex.length ? `<div class="grp"><span>Flex · plays with core, plays the 5th Q</span><span class="num">${hf - hn}/${flex.length}</span></div>${flex.map(row).join('')}` : ''}
       <div class="grp"><span>Developing</span><span class="num">${hd}/${dev.length}</span></div>${dev.map(row).join('')}
     </div>
   </section>
@@ -858,7 +886,7 @@ function viewToday(){
   <section class="block">
     <h2>Game format</h2>
     <div class="card fields">
-      ${field('Developing players on the floor in the real game', 'devOnFloor', [[1, '1'], [2, '2']], s.devOnFloor === 1 ? 'Always at least 3 core on the floor. The 4th spot is a core player or one of the near-core/flex players, never both of them with a developing player.' : '3 core + 2 developing. Near-core and flex players only play the real game when a core player is missing.')}
+      ${field('Developing players on the floor in the real game', 'devOnFloor', [[1, '1'], [2, '2']], s.devOnFloor === 1 ? 'Always at least 3 core on the floor. With every core player here, flex players only play next to core and near-core players: they take the developing spot for their stretches.' : '3 core + 2 developing. Near-core and flex players only play the real game when a core player is missing.')}
       ${field('Core minutes', 'coreMode', [['even', 'Even'], ['balanced', 'Lean top'], ['win', 'Win now']], mode)}
       ${field('Best core players start the game', 'startStrong', [[true, 'Yes'], [false, 'No']])}
       ${field('Best core players finish the game', 'finishStrong', [[true, 'Yes'], [false, 'No']])}
@@ -1029,7 +1057,7 @@ function segCards(){
       <header><span class="sl">${Engine.segLabel(g, s)}</span><span class="ck num">${fmt(g.start)}–${fmt(g.end)}</span>
         ${res[i] && res[i].d != null ? `<span class="res ${res[i].d > 0 ? 'pos' : res[i].d < 0 ? 'neg' : ''} num">${sign(res[i].d)} <small>${g.sc.us}–${g.sc.them}</small></span>` : ''}
         ${g.situ ? `<span class="tag ${g.situ === 'close' ? 'core' : 'dev'}">${g.situ === 'close' ? 'Close' : 'Dev time'}</span>` : ''}
-        ${thinCore(g) ? `<span class="tag thin">${thinCore(g)} core</span>` : ''}
+        ${lineupWarn(g) ? `<span class="tag thin">${esc(lineupWarn(g).tag)}</span>` : ''}
         ${g.locked ? `<span class="ed">Edited <button class="btn link small" data-act="unlock" data-seg="${i}">Undo</button></span>` : ''}</header>
       <div class="chg">${chg}</div>
       <div class="chips">${sortIds(g.lineup).map(id => { const p = byId(id); return `<button class="chip ${p ? p.tier : ''}" data-act="pick" data-seg="${i}" data-id="${id}">${p && p.num ? `<small>#${esc(p.num)}</small>` : ''}${esc(p ? p.name : 'Removed')}</button>`; }).join('')}</div>
@@ -1324,8 +1352,8 @@ const A = {
     g.lineup = g.lineup.map(x => x === d.out ? d.in : x);
     g.locked = true;
     replan(); UI.sheet = null;
-    const n = thinCore(g);
-    toast(`${pname(d.in, false)} in for ${pname(d.out, false)}${n ? ` · only ${n} core on the floor` : ''}`);
+    const w = lineupWarn(g);
+    toast(`${pname(d.in, false)} in for ${pname(d.out, false)}${w ? ' · ' + w.msg : ''}`);
   },
   unlock(d){ S.plan.segs[+d.seg].locked = false; replan(); },
   markOut(d){
