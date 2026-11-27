@@ -990,8 +990,13 @@ function segCards(){
 function viewRotation(){
   const P = S.plan;
   if (!P) return `<div class="card empty"><h3>No rotation yet</h3><p>Pick who's here and the game format, then build today's rotation.</p><button class="btn primary" data-act="tab" data-tab="today">Go to Today</button></div>`;
-  const stale = P.key !== planKey() && P.cur == null;
+  // Who's-here changes made after the rotation was built (shown even mid-game, with a one-tap fix).
+  const missing = S.roster.filter(p => isHere(p.id) && !P.present.includes(p.id)).map(p => p.id);
+  const gone = P.present.filter(id => byId(id) && !isHere(id) && !P.out.includes(id));
+  const syncNote = missing.length || gone.length ? `<div class="note"><span>${missing.length ? `<b>${missing.map(id => esc(pname(id, false))).join(', ')} ${missing.length > 1 ? 'are' : 'is'} marked here but not in this rotation.</b> ` : ''}${gone.length ? `<b>${gone.map(id => esc(pname(id, false))).join(', ')} ${gone.length > 1 ? 'are' : 'is'} marked out but still in this rotation.</b>` : ''}</span><button class="btn small" data-act="syncHere">${missing.length && !gone.length ? 'Add to rotation' : 'Update rotation'}</button></div>` : '';
+  const stale = P.key !== planKey() && P.cur == null && !syncNote;
   return `
+  ${syncNote}
   ${stale ? `<div class="note"><span><b>Out of date.</b> Players or settings changed after this was built.</span><button class="btn small" data-act="build">Rebuild</button></div>` : ''}
   ${liveCard()}
   <section class="block">
@@ -1286,6 +1291,18 @@ const A = {
     const from = P.cur == null ? 0 : P.cur + 1;
     P.segs.forEach((g, i) => { if (i >= from && g.locked && g.lineup.includes(d.id)) g.locked = false; });
     replan(); UI.sheet = null; toast(msg);
+  },
+  syncHere(){
+    const P = S.plan;
+    const missing = S.roster.filter(p => isHere(p.id) && !P.present.includes(p.id)).map(p => p.id);
+    const gone = P.present.filter(id => byId(id) && !isHere(id) && !P.out.includes(id));
+    const fresh = P.cur == null && !P.segs.some(g => g.locked) && !P.out.length;
+    if (fresh){ buildPlan(); toast('Rotation rebuilt with today\'s players'); return; }
+    missing.forEach(id => P.present.push(id));
+    gone.forEach(id => A.markOut({id}));
+    replan();
+    if (JSON.stringify(P.s) === JSON.stringify(S.settings)) P.key = planKey();
+    toast(missing.length ? `${missing.map(id => pname(id, false)).join(', ')} added. Rest of the game re-balanced.` : 'Rotation updated');
   },
   returnIn(d){ S.plan.out = S.plan.out.filter(x => x !== d.id); replan(); toast(`${pname(d.id, false)} is back in the rotation`); },
   saveGame(){
