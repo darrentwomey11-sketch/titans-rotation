@@ -113,7 +113,7 @@ h3{margin:0}
 .tag.near,.chip.near{background:var(--near-soft);color:var(--near-ink)}
 .rgrid .cell.on.near i{background:var(--near)}
 .proj .near-c .big{color:var(--near)}
-.tag.out{background:var(--bad-soft);color:var(--bad)}
+.tag.out,.tag.thin{background:var(--bad-soft);color:var(--bad)}
 
 /* who's here */
 .plist{display:flex;flex-direction:column;gap:6px}
@@ -450,9 +450,13 @@ const Engine = (() => {
     }
     Object.keys(fixed).forEach(i => fixed[i].forEach(id => got[id] += segs[i].len));
 
+    // Never fewer than 3 core players on the floor in the real game (all of them if fewer are here):
+    // a near-core or flex player only fills the 4th spot when a developing player is on.
+    const isCore = p => p.tier === 'core';
+    const minCore = Math.min(3, c, core.filter(isCore).length);
     const pick = (group, k, i, isDev) => {
       const prev = i > 0 && segs[i-1].kind === 'game' ? new Set(segs[i-1].lineup) : new Set();
-      return group.slice().sort((a, b) => {
+      const order = group.slice().sort((a, b) => {
         // A developing player never stays on for two stretches in a row (no full quarter) if another one can go in.
         if (isDev){ const ra = prev.has(a.id) ? 1 : 0, rb = prev.has(b.id) ? 1 : 0; if (ra !== rb) return ra - rb; }
         const na = target[a.id] - got[a.id] - base[a.id], nb = target[b.id] - got[b.id] - base[b.id];
@@ -464,7 +468,29 @@ const Engine = (() => {
           if (Math.abs(sa - sb) > 0.01) return sa - sb;
         }
         return a.rank - b.rank;
-      }).slice(0, k).map(p => p.id);
+      });
+      let sel = order.slice(0, k);
+      if (!isDev){
+        const swap = (want, n) => {
+          const add = order.filter(p => want(p) && !sel.includes(p)).slice(0, n);
+          const drop = sel.filter(p => !want(p)).slice(-add.length);
+          sel = sel.filter(p => !drop.includes(p)).concat(add);
+        };
+        const short = minCore - sel.filter(isCore).length;
+        if (short > 0) swap(isCore, short);
+        // Near-core and flex players share only the spot(s) above the 3 core, so don't let it go to a core player
+        // when they still need every one of those spots left to reach their minutes.
+        const swing = k - minCore, len = segs[i].len;
+        if (swing > 0){
+          const others = group.filter(p => !isCore(p));
+          const need = others.reduce((a, p) => a + Math.max(0, target[p.id] - got[p.id]), 0);
+          const later = free.filter(j => j > i && !fixed[j]).reduce((a, j) => a + segs[j].len, 0) * swing;
+          const must = Math.min(swing, others.length, Math.max(0, Math.ceil((need - later) / len - 0.01)));
+          const has = sel.filter(p => !isCore(p)).length;
+          if (has < must) swap(p => !isCore(p), must - has);
+        }
+      }
+      return sel.map(p => p.id);
     };
 
     for (const i of free){
@@ -631,6 +657,15 @@ function replan(){
   const players = ranked().filter(p => P.present.includes(p.id) && !P.out.includes(p.id));
   Engine.allocate(P.segs, players, P.s, {lockedUntil, season:seasonAvg()});
 }
+// A real-game stretch with fewer than 3 core on the floor while more are available (only happens from a hand edit).
+function thinCore(g){
+  const P = S.plan;
+  if (!g || g.kind !== 'game') return 0;
+  const isC = id => { const p = byId(id); return !!p && tierOf(p) === 'core'; };
+  const avail = P.present.filter(id => !P.out.includes(id) && isC(id)).length;
+  const n = g.lineup.filter(isC).length;
+  return n < Math.min(3, avail) ? n : 0;
+}
 function changes(a, b){
   return {ins: sortIds(b.lineup.filter(x => !a.lineup.includes(x))), outs: sortIds(a.lineup.filter(x => !b.lineup.includes(x)))};
 }
@@ -663,6 +698,12 @@ function bestReplacement(cur, outId){
   const ideal = copy[cur].lineup.filter(id => bench.includes(id));
   const m = Engine.minutes(P.segs);
   const fewest = ids => ids.slice().sort((a, b) => ((m[a] || {g:0}).g - (m[b] || {g:0}).g) || rankOf(a) - rankOf(b));
+  // Losing a core player would leave fewer than 3 core on the floor: bring in a core player if one is on the bench.
+  const isCoreId = id => { const p = byId(id); return !!p && tierOf(p) === 'core'; };
+  if (g.lineup.filter(id => id !== outId && isCoreId(id)).length < Math.min(3, players.filter(p => tierOf(p) === 'core').length)){
+    const c = ideal.find(isCoreId) || fewest(bench.filter(isCoreId))[0];
+    if (c) return c;
+  }
   return ideal.find(id => good(id) === want) || fewest(bench.filter(id => good(id) === want))[0] || ideal[0] || fewest(bench)[0] || null;
 }
 // Points for minus points against in each real-game stretch, from the scores typed at each sub (null when unknown).
@@ -717,7 +758,7 @@ function suggestion(sit){
     const bestDev = devs.slice().sort((a, b) => ((impactOf(b.id) ?? -99) - (impactOf(a.id) ?? -99)) || a.rank - b.rank);
     five = [...good.slice(0, 5).map(p => p.id), ...bestDev.slice(0, Math.max(0, 5 - good.length)).map(p => p.id)];
   } else {
-    // Rest the busiest core player for a second developing player; a sitting flex (Ava) or near-core player in for the next-busiest.
+    // A second developing player comes in for a near-core or flex player if one is on, otherwise for the busiest core player.
     const played = {};
     P.segs.slice(0, P.cur + 1).forEach(x => { if (x.kind === 'game') x.lineup.forEach(id => played[id] = (played[id] || 0) + x.len); });
     const season = seasonAvg();
@@ -725,10 +766,14 @@ function suggestion(sit){
     const coreOn = five.filter(id => { const p = byId(id); return p && tierOf(p) === 'core'; }).sort((a, b) => (played[b] || 0) - (played[a] || 0) || rankOf(a) - rankOf(b));
     const freshDev = devs.filter(p => !five.includes(p.id) && !g.lineup.includes(p.id)).concat(devs.filter(p => !five.includes(p.id) && g.lineup.includes(p.id)))
       .sort((a, b) => (g.lineup.includes(a.id) - g.lineup.includes(b.id)) || ((played[a.id] || 0) - (played[b.id] || 0)) || ((season[a.id] || 0) - (season[b.id] || 0)) || b.rank - a.rank);
+    // Even in a blowout 3 core stay on (all of them if fewer are here): the other two spots go to developing players.
+    const keep = Math.min(3, avail.filter(p => tierOf(p) === 'core').length);
     const devCount = five.filter(id => { const p = byId(id); return p && !isGood(p); }).length;
-    if (devCount < 2 && coreOn.length && freshDev.length) five = five.map(id => id === coreOn[0] ? freshDev[0].id : id);
-    const flexOff = good.filter(p => (tierOf(p) === 'flex' || tierOf(p) === 'near') && !five.includes(p.id)).sort((a, b) => LVL[tierOf(b)] - LVL[tierOf(a)] || b.rank - a.rank);
-    if (flexOff.length && coreOn.length > 1) five = five.map(id => id === coreOn[1] ? flexOff[0].id : id);
+    const midOn = five.filter(id => { const p = byId(id); return p && (tierOf(p) === 'near' || tierOf(p) === 'flex'); }).sort((a, b) => LVL[tierOf(byId(a))] - LVL[tierOf(byId(b))] || rankOf(a) - rankOf(b));
+    if (devCount < 2 && freshDev.length){
+      const outId = midOn[0] || (coreOn.length > keep ? coreOn[0] : null);
+      if (outId) five = five.map(id => id === outId ? freshDev[0].id : id);
+    }
   }
   five = five.filter((id, i) => id && five.indexOf(id) === i).slice(0, 5);
   const same = five.length === nx.lineup.length && five.every(id => nx.lineup.includes(id));
@@ -794,6 +839,7 @@ function viewToday(){
     ${S.sample ? `<div class="note"><span><b>Sample roster.</b> Put in your real players on the Roster tab.</span><button class="btn small" data-act="tab" data-tab="roster">Edit roster</button></div>` : ''}
     <p class="help">Tap a player to mark them out (hurt, sick, missing).</p>
     ${hc > 0 && hc <= 5 - s.devOnFloor ? `<div class="note"><span><b>Only ${hc} core${hf ? ' and flex' : ''} here.</b> They'll play the whole game${hc < 5 - s.devOnFloor ? ' and developing players fill the open spots' : ''}.${s.devOnFloor === 1 && hd >= 2 ? ' Switching to 3 core + 2 dev gives them a breather.' : ''}</span></div>` : ''}
+    ${hk > 0 && hk <= 3 && hc > 5 - s.devOnFloor ? `<div class="note"><span><b>Only ${hk} core here.</b> ${hk === 3 ? 'To keep 3 core on the floor, they play the whole game.' : 'They play the whole game.'}</span></div>` : ''}
     <div class="plist">
       <div class="grp"><span>Core</span><span class="num">${hk}/${core.length}</span></div>${core.map(row).join('')}
       ${near.length ? `<div class="grp"><span>Near core · first off the bench</span><span class="num">${hn}/${near.length}</span></div>${near.map(row).join('')}` : ''}
@@ -812,7 +858,7 @@ function viewToday(){
   <section class="block">
     <h2>Game format</h2>
     <div class="card fields">
-      ${field('On the floor in the real game', 'devOnFloor', [[1, '4 core + 1 dev'], [2, '3 core + 2 dev']])}
+      ${field('Developing players on the floor in the real game', 'devOnFloor', [[1, '1'], [2, '2']], s.devOnFloor === 1 ? 'Always at least 3 core on the floor. The 4th spot is a core player or one of the near-core/flex players, never both of them with a developing player.' : '3 core + 2 developing. Near-core and flex players only play the real game when a core player is missing.')}
       ${field('Core minutes', 'coreMode', [['even', 'Even'], ['balanced', 'Lean top'], ['win', 'Win now']], mode)}
       ${field('Best core players start the game', 'startStrong', [[true, 'Yes'], [false, 'No']])}
       ${field('Best core players finish the game', 'finishStrong', [[true, 'Yes'], [false, 'No']])}
@@ -828,14 +874,14 @@ function viewToday(){
   <section class="block">
     <h2>Game situations</h2>
     <div class="card fields">
-      ${field('Suggest lineups from the score', 'suggest', [[true, 'Yes'], [false, 'No']], 'Type the score at each sub in live mode. Close late: it suggests your best five (no developing player). Big lead (or out of reach): it suggests a second developing player and a rest for your busiest starter. You decide; nothing changes until you tap it.')}
+      ${field('Suggest lineups from the score', 'suggest', [[true, 'Yes'], [false, 'No']], 'Type the score at each sub in live mode. Close late: it suggests your best five (no developing player). Big lead (or out of reach): it suggests a second developing player, with 3 core staying on. You decide; nothing changes until you tap it.')}
       ${s.suggest ? field('Close game means within', 'closeWithin', [[4, '4 pts'], [6, '6 pts'], [8, '8 pts']], 'Checked from the middle of the 3rd quarter on.') : ''}
       ${s.suggest ? field('Big lead means up by', 'bigLead', [[10, '10 pts'], [15, '15 pts'], [20, '20 pts']], `After the 1st quarter. In the 4th, ${s.bigLead - 5}+ counts. Down ${s.bigLead + 5}+ in the 2nd half counts too.`) : ''}
     </div>
   </section>
 
   ${armBtn('build', 'Build today\'s rotation', 'Replace the rotation in progress?', 'build', building, 'btn primary big')}
-  <p class="help">Developing players play the whole 5th quarter${flex.length ? ', with flex players filling any open spot' : ''}. Core and near-core players skip it. In the real game the floor always has ${s.devOnFloor === 1 ? '4 core players and 1 developing player' : '3 core players and 2 developing players'}, and minutes are spread as evenly as that allows.</p>`;
+  <p class="help">Developing players play the whole 5th quarter${flex.length ? ', with flex players filling any open spot' : ''}. Core and near-core players skip it. In the real game the floor always has at least 3 core players and ${s.devOnFloor === 1 ? '1 developing player' : '2 developing players'}, and minutes are spread as evenly as that allows.</p>`;
 }
 
 /* ---------- home screen install ---------- */
@@ -983,6 +1029,7 @@ function segCards(){
       <header><span class="sl">${Engine.segLabel(g, s)}</span><span class="ck num">${fmt(g.start)}–${fmt(g.end)}</span>
         ${res[i] && res[i].d != null ? `<span class="res ${res[i].d > 0 ? 'pos' : res[i].d < 0 ? 'neg' : ''} num">${sign(res[i].d)} <small>${g.sc.us}–${g.sc.them}</small></span>` : ''}
         ${g.situ ? `<span class="tag ${g.situ === 'close' ? 'core' : 'dev'}">${g.situ === 'close' ? 'Close' : 'Dev time'}</span>` : ''}
+        ${thinCore(g) ? `<span class="tag thin">${thinCore(g)} core</span>` : ''}
         ${g.locked ? `<span class="ed">Edited <button class="btn link small" data-act="unlock" data-seg="${i}">Undo</button></span>` : ''}</header>
       <div class="chg">${chg}</div>
       <div class="chips">${sortIds(g.lineup).map(id => { const p = byId(id); return `<button class="chip ${p ? p.tier : ''}" data-act="pick" data-seg="${i}" data-id="${id}">${p && p.num ? `<small>#${esc(p.num)}</small>` : ''}${esc(p ? p.name : 'Removed')}</button>`; }).join('')}</div>
@@ -1276,7 +1323,9 @@ const A = {
     const g = S.plan.segs[+d.seg];
     g.lineup = g.lineup.map(x => x === d.out ? d.in : x);
     g.locked = true;
-    replan(); UI.sheet = null; toast(`${pname(d.in, false)} in for ${pname(d.out, false)}`);
+    replan(); UI.sheet = null;
+    const n = thinCore(g);
+    toast(`${pname(d.in, false)} in for ${pname(d.out, false)}${n ? ` · only ${n} core on the floor` : ''}`);
   },
   unlock(d){ S.plan.segs[+d.seg].locked = false; replan(); },
   markOut(d){
