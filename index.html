@@ -420,10 +420,12 @@ const Engine = (() => {
     const restLen = gameIdx.length ? Math.max(...gameIdx.map(i => segs[i].len)) : 0;
     const coreCap = core.length > c ? Math.max(0, totalGame - restLen) : totalGame;
     waterfill(core, c * freeMin + core.reduce((a, p) => a + got[p.id], 0), w, coreCap, target);
-    // Developing players are evened out on total minutes, so once the 5th quarter has been played it counts too.
+    // Developing players are evened out on total minutes, so once the whole 5th quarter has been played it counts too.
+    // While it's still being planned (or partly edited), the 5th quarter does the evening out itself.
     const base = {};
     players.forEach(p => base[p.id] = 0);
-    segs.forEach((g, i) => { if (g.kind === 'fifth' && isLocked(g, i)) g.lineup.forEach(id => { if (dev.some(p => p.id === id)) base[id] += g.len; }); });
+    const fifthDone = segs.every((g, i) => g.kind !== 'fifth' || i < lockedUntil);
+    if (fifthDone) segs.forEach((g, i) => { if (g.kind === 'fifth') g.lineup.forEach(id => { if (dev.some(p => p.id === id)) base[id] += g.len; }); });
     const maxBase = Math.max(0, ...Object.values(base));
     waterfill(dev, d * freeMin + dev.reduce((a, p) => a + got[p.id] + base[p.id], 0), w, totalGame + maxBase, target);
 
