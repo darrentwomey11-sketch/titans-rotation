@@ -286,6 +286,7 @@ textarea.in-txt{height:96px;padding:8px 10px;font-family:ui-monospace,Menlo,mono
 .situ.close{background:rgb(240 124 56 / .16);border-color:rgb(240 124 56 / .5)}
 .situ.dev{background:rgb(154 128 240 / .18);border-color:rgb(154 128 240 / .55)}
 .situ > b{font-size:15px}
+.nextfive{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .five{display:flex;flex-wrap:wrap;gap:6px}
 .five span{border-radius:999px;padding:4px 10px;font-size:14px;font-weight:600;background:rgb(255 255 255 / .1)}
 .five span.new{background:#fff;color:#13203a}
@@ -894,7 +895,9 @@ function liveCard(){
     nextHTML = `<div class="next"><span class="eyebrow">Next sub · ${when}</span>
       ${nx.kind !== g.kind ? `<div class="io"><div><b class="in">START</b> ${sortIds(nx.lineup).map(id => esc(pname(id))).join(', ')}</div></div>` :
         (ins.length ? `<div class="io"><div><b class="in">IN</b> ${ins.map(id => esc(pname(id))).join(', ')}</div><div><b class="outx">OUT</b> ${outs.map(id => esc(pname(id))).join(', ')}</div></div>` : '<span>Same five stay on.</span>')}
-      ${cue}</div>`;
+      ${cue}
+      <div class="nextfive"><span class="eyebrow">Next five · tap a name to change</span><div class="chips">${sortIds(nx.lineup).map(id => { const p = byId(id);
+        return `<button class="chip ${p ? tierOf(p) : ''}" data-act="pick" data-seg="${P.cur + 1}" data-id="${id}">${esc(p ? p.name : 'Removed')}</button>`; }).join('')}</div></div></div>`;
     if (mid && ins.length){
       const opts = [0.5, -0.5, -1, -1.5, -2].map(d => pe + d).filter(t => t < g.start - 0.2 && t > nx.end + 0.2);
       chips = `<div class="late"><span class="eyebrow">Sub went in at a different time? Tap it</span><div class="late-row">${opts.map(t =>
@@ -905,7 +908,7 @@ function liveCard(){
   if (g.kind === 'game'){
     const sc = readScore(), m = sc ? sc.us - sc.them : null;
     const stale = sc && !P.scoreTouched && P.cur > 0 && segs[P.cur - 1].kind === 'game';
-    scoreRow = `<div class="scorebox"><div class="sb-head"><span class="eyebrow">Score at this sub</span><span class="sb-m">${m == null ? 'Type the scoreboard' : m > 0 ? 'Up ' + m : m < 0 ? 'Down ' + -m : 'Tied'}</span></div>
+    scoreRow = `<div class="scorebox"><div class="sb-head"><span class="eyebrow">Score at this sub</span><span class="sb-m">${m == null ? 'Enter score' : m > 0 ? 'Up ' + m : m < 0 ? 'Down ' + -m : 'Tied'}</span></div>
       <div class="sb-row"><label><span>${esc(S.team || 'Us')}</span><input class="num" inputmode="numeric" pattern="[0-9]*" data-score="us" value="${esc(P.score ? P.score.us : '')}" placeholder="0" aria-label="Our score"></label>
       <span class="sb-dash">–</span>
       <label><span>Them</span><input class="num" inputmode="numeric" pattern="[0-9]*" data-score="them" value="${esc(P.score ? P.score.them : '')}" placeholder="0" aria-label="Their score"></label></div>
@@ -1130,9 +1133,10 @@ function sheetHTML(){
     const P = S.plan, g = P.segs[sh.seg], m = Engine.minutes(P.segs);
     const bench = ranked().filter(p => P.present.includes(p.id) && !P.out.includes(p.id) && !g.lineup.includes(p.id));
     const me = byId(sh.id), mm = m[sh.id] || {g:0, f:0};
-    return `<h3>${esc(pname(sh.id))}</h3>
+    const isNext = P.cur != null && sh.seg === P.cur + 1, onNow = isNext ? P.segs[P.cur].lineup : [];
+    return `<h3>${isNext ? 'Next sub: ' : ''}${esc(pname(sh.id))}</h3>
       <p class="help">${Engine.segLabel(g, P.s)} ${fmt(g.start)}–${fmt(g.end)} · ${mins(mm.g)} min planned in the game${P.s.fifth ? ', ' + mins(mm.f) + ' in the 5th Q' : ''}</p>
-      ${bench.length ? `<div class="field"><span class="eyebrow">Swap in for this stretch</span><div class="opts">${bench.map(b => { const bm = m[b.id] || {g:0, f:0}; return `<button class="opt" data-act="swap" data-seg="${sh.seg}" data-out="${sh.id}" data-in="${b.id}"><span>${nameHTML(b.id)}${b.note ? `<em>${esc(b.note)}</em>` : ''}</span><span class="tag ${b.tier}">${tierWord(b.tier)}</span><small class="num">${mins(bm.g)} min</small></button>`; }).join('')}</div>
+      ${bench.length ? `<div class="field"><span class="eyebrow">${isNext ? 'Who goes in instead?' : 'Swap in for this stretch'}</span><div class="opts">${bench.map(b => { const bm = m[b.id] || {g:0, f:0}; return `<button class="opt" data-act="swap" data-seg="${sh.seg}" data-out="${sh.id}" data-in="${b.id}"><span>${nameHTML(b.id)}${b.note ? `<em>${esc(b.note)}</em>` : ''}</span><span class="tag ${b.tier}">${tierWord(b.tier)}</span><small class="num">${onNow.includes(b.id) ? 'stays on' : mins(bm.g) + ' min'}</small></button>`; }).join('')}</div>
       <p class="help">Swapping locks this stretch. The rest of the game re-balances.</p></div>` : '<p class="help">Nobody is on the bench to swap in.</p>'}
       ${me ? `<button class="opt-danger" data-act="markOut" data-id="${sh.id}">Hurt / out for the rest of the game</button>` : ''}
       <button class="btn" data-act="closeSheet">Cancel</button>`;
@@ -1200,7 +1204,7 @@ function rerenderLive(){
   if (!S.plan || S.plan.cur == null) return;
   const sc = readScore(), m = sc ? sc.us - sc.them : null;
   const el = document.querySelector('.sb-m');
-  if (el) el.textContent = m == null ? 'Type the scoreboard' : m > 0 ? 'Up ' + m : m < 0 ? 'Down ' + -m : 'Tied';
+  if (el) el.textContent = m == null ? 'Enter score' : m > 0 ? 'Up ' + m : m < 0 ? 'Down ' + -m : 'Tied';
   const st = document.querySelector('.scorebox .cue'); if (st) st.remove();
   const box = document.getElementById('situ'); if (box) box.innerHTML = situationHTML();
 }
