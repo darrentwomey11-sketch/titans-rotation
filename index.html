@@ -528,7 +528,7 @@ const Engine = (() => {
 
 <script>
 const KEY = 'titans-rotation-v1';
-const DEFAULT_SETTINGS = {periods:4, qLen:7, subsPerQ:2, fifth:true, fifthLen:8, fifthSubs:1, devOnFloor:1, coreMode:'balanced', startStrong:true, finishStrong:true, suggest:true, closeWithin:6, bigLead:15};
+const DEFAULT_SETTINGS = {periods:4, qLen:6, subsPerQ:2, fifth:true, fifthLen:7, fifthSubs:1, devOnFloor:1, coreMode:'balanced', startStrong:true, finishStrong:true, suggest:true, closeWithin:6, bigLead:15};
 const uid = () => 'p' + Math.random().toString(36).slice(2, 9);
 const TEAM_ROSTER = [
   ['Ellie',   'core', 'Strong ball handler, drives to the hoop'],
@@ -555,7 +555,7 @@ function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e)
 let S = load();
 if (!S || !Array.isArray(S.roster) || !S.roster.length) S = fresh();
 // Phones that opened the earlier version still hold the "Player 1–11" placeholders: swap in the team.
-if (S.sample){ S.roster = sampleRoster(); S.sample = false; S.here = {}; S.plan = null; S.settings.qLen = 7; }
+if (S.sample){ S.roster = sampleRoster(); S.sample = false; S.here = {}; S.plan = null; }
 // Stella moved from core to the new flex level.
 if (!S.flexV){ const st = S.roster.find(p => p.id === 'pstella'); if (st && st.tier === 'core') st.tier = 'flex'; S.flexV = 1; }
 // v2: 2-minute subs in the 5th quarter so Stella can play part of it.
@@ -565,6 +565,8 @@ if (!S.v2){ S.v2 = 1; }
 // v3: Stella is near core (no 5th quarter); developing players play the whole 5th quarter, so no 5th-quarter subs by default.
 if (!S.v3){ const st = S.roster.find(p => p.id === 'pstella'); if (st && st.tier === 'flex') st.tier = 'near';
   if (S.settings){ S.settings.fifthSubs = 1; delete S.settings.flexFifth; } S.v3 = 1; }
+// v4: real quarters are 6 minutes and the 5th quarter is 7.
+if (!S.v4){ if (S.settings){ S.settings.qLen = 6; S.settings.fifthLen = 7; } S.v4 = 1; }
 S.settings = {...DEFAULT_SETTINGS, ...(S.settings || {})};
 S.here = S.here || {};
 S.history = S.history || [];
@@ -818,7 +820,7 @@ function viewToday(){
       ${field(periodWord(s) + ' length', 'qLen', lenOptions(s).map(v => [v, v + ' min']))}
       ${field('Sub every', 'subsPerQ', [1, 2, 3, 4].map(n => [n, fmt(s.qLen / n)]), `${s.subsPerQ} line change${s.subsPerQ > 1 ? 's' : ''} per ${pw}, at dead balls near ${Array.from({length:s.subsPerQ}, (_, i) => fmt(s.qLen - i * len)).join(', ')}.`)}
       ${field('5th quarter before the game', 'fifth', [[true, 'Yes'], [false, 'No']])}
-      ${s.fifth ? field('5th quarter length', 'fifthLen', [[6, '6 min'], [8, '8 min'], [10, '10 min']]) : ''}
+      ${s.fifth ? field('5th quarter length', 'fifthLen', [[6, '6 min'], [7, '7 min'], [8, '8 min'], [10, '10 min']]) : ''}
       ${s.fifth ? field('5th quarter sub every', 'fifthSubs', [[1, 'No subs'], [2, fmt(s.fifthLen / 2)], [4, fmt(s.fifthLen / 4)]]) : ''}
     </div>
   </section>
@@ -1224,7 +1226,7 @@ const A = {
   set(d){
     const v = JSON.parse(d.val);
     S.settings[d.key] = v;
-    if (d.key === 'periods' && !lenOptions(S.settings).includes(S.settings.qLen)) S.settings.qLen = v === 2 ? 14 : 7;
+    if (d.key === 'periods' && !lenOptions(S.settings).includes(S.settings.qLen)) S.settings.qLen = v === 2 ? 14 : 6;
   },
   arm(d){ UI.armed = d.key; return 'keepArm'; },
   build(){ buildPlan(); S.tab = 'rotation'; window.scrollTo(0, 0); toast('Rotation built'); },
